@@ -1,0 +1,21 @@
+node_modules/
+dist/
+/build/
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+probe-out.txt
+smoke-email.txt
+su.json
+su-resp.json
+android/.gradle/
+android/local.properties
+android/app/build/
+android/build/
+
+# Android signing credentials (never commit these)
+*.jks
+*.keystore
+key.properties

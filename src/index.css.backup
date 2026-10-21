@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+  --fb-charcoal: #111111;
+  --fb-surface: #1b1b1b;
+  --fb-gold: #f4c75b;
+  --fb-gold-deep: #b8860b;
+}
+
+html { background: var(--fb-charcoal); }
+body { min-width: 320px; background: var(--fb-charcoal); }
+button, a { -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 2px solid var(--fb-gold); outline-offset: 3px; }

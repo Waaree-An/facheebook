@@ -1,0 +1,231 @@
+FACHEEBOOK SAMPLE STUDY MATERIAL
+
+MATERIAL DETAILS — COPY THESE INTO “ADD STUDY MATERIAL”
+
+Title: Introduction to Algorithms: Clear Steps for Solving Problems
+Subject: Computer Science
+Author / instructor: FacheeBook Sample
+Suggested status: To Read
+Suggested priority: Medium
+Suggested tags: computer science, algorithms, problem solving, beginner
+Suggested description: A beginner-friendly introduction to algorithms, step-by-step instructions, and simple ways to check a solution.
+Suggested notes: Try the practice tasks first without looking at the sample solutions.
+Suggested key takeaways:
+- An algorithm is a clear sequence of steps for solving a problem.
+- A good algorithm needs clear inputs, steps, and an expected result.
+- Testing with different examples can reveal missing cases.
+- Breaking a large problem into smaller steps makes it easier to solve.
+
+This original sample is for testing study-material entry, document upload, preview, search, notes, key takeaways, and study tools. It is not a textbook chapter or a replacement for course material.
+
+============================================================
+1. WHAT IS AN ALGORITHM?
+============================================================
+
+An algorithm is a clear sequence of steps used to solve a problem or complete a task. A recipe, a route written as directions, and a computer program can all describe step-by-step processes.
+
+An algorithm should be:
+
+- Clear: each step has one understandable meaning.
+- Ordered: the steps happen in a useful sequence.
+- Finite: it eventually reaches an end.
+- Useful: following the steps helps produce the intended result.
+
+Example problem:
+Find the larger of two numbers.
+
+Steps:
+1. Read the first number.
+2. Read the second number.
+3. Compare the two numbers.
+4. If the first is larger, report the first.
+5. Otherwise, report the second.
+
+This example needs one more decision: what should happen if the two numbers are equal? A complete solution should say so.
+
+============================================================
+2. INPUT, PROCESS, AND OUTPUT
+============================================================
+
+Many problems can be described with three parts:
+
+INPUT — the information given to the solution.
+PROCESS — the steps used to work with that information.
+OUTPUT — the answer or result produced.
+
+Example: Calculate the total cost of several identical notebooks.
+
+Input:
+- Price of one notebook
+- Number of notebooks
+
+Process:
+- Multiply the price by the number of notebooks.
+
+Output:
+- Total cost
+
+If one notebook costs 25 birr and a student buys 4 notebooks:
+
+25 x 4 = 100 birr
+
+Before calculating, ask whether the number of notebooks can be zero, whether prices can include decimals, and what units the answer should use. Careful problem solving includes these details.
+
+============================================================
+3. BREAK A BIG PROBLEM INTO SMALLER PARTS
+============================================================
+
+Breaking a problem into smaller tasks is called decomposition. Smaller tasks are often easier to understand, build, and test.
+
+Example problem:
+Plan a study session for one subject.
+
+Possible smaller tasks:
+1. Choose the subject.
+2. Choose one topic.
+3. Decide how long to study.
+4. Gather the needed materials.
+5. Study and try a recall question.
+6. Record what needs review next.
+
+This idea is useful in programming and in everyday planning. If one step is still difficult, break that step into smaller steps too.
+
+============================================================
+4. DECISIONS AND REPETITION
+============================================================
+
+Algorithms often use decisions. A decision chooses different steps depending on whether a condition is true or false.
+
+Example:
+If the student has answered every practice question, show the results.
+Otherwise, continue to the next unanswered question.
+
+Algorithms can also repeat steps. Repetition is useful when a task must happen for every item in a list.
+
+Example:
+For each of the 5 practice questions:
+1. Show the question.
+2. Read the student's answer.
+3. Check the answer.
+4. Record the result.
+
+A repetition needs a way to stop. If the stopping condition is missing or never becomes true, the process may continue forever. This is called an infinite loop.
+
+============================================================
+5. WRITE A SIMPLE ALGORITHM
+============================================================
+
+Problem:
+Find the total number of minutes in a chosen number of study sessions.
+
+Pseudocode:
+
+START
+  Ask for the number of sessions
+  Set total minutes to 0
+  Repeat once for each session
+    Ask how many minutes the session lasted
+    Add those minutes to total minutes
+  Show total minutes
+END
+
+Pseudocode is a way to describe program steps using plain language and simple structure. It is not tied to one programming language.
+
+Check the assumptions:
+- Is the number of sessions zero or greater?
+- Can a session last zero minutes?
+- Should a negative number be rejected?
+- What should happen if the user enters text instead of a number?
+
+Good problem solving includes deciding how invalid or unexpected inputs should be handled.
+
+============================================================
+6. TEST THE SOLUTION
+============================================================
+
+Testing means trying examples to check whether a solution behaves as expected. One example is rarely enough.
+
+For the “find the larger of two numbers” problem, try:
+
+Test A: 8 and 3. Expected result: 8.
+Test B: 2 and 9. Expected result: 9.
+Test C: 5 and 5. Expected result: equal.
+Test D: -4 and -1. Expected result: -1.
+
+These examples check different cases: first number larger, second number larger, equal values, and negative values.
+
+When a test fails:
+1. Record the input that caused the problem.
+2. Compare the actual result with the expected result.
+3. Find which step made the wrong choice.
+4. Correct the steps.
+5. Run the failed test again and try other cases.
+
+============================================================
+7. PRACTICE TASKS
+============================================================
+
+Try each task before reading the sample answers.
+
+TASK 1
+Write steps for deciding whether a number is even or odd.
+
+TASK 2
+For a program that calculates the area of a rectangle, name the inputs, process, and output.
+
+TASK 3
+Why should a solution be tested with equal values as well as different values?
+
+TASK 4
+What could happen if a repetition has no stopping condition?
+
+TASK 5
+Break the task “prepare for tomorrow's class” into at least four smaller steps.
+
+============================================================
+8. SAMPLE ANSWERS
+============================================================
+
+TASK 1
+Read a whole number. Divide it by 2. If the remainder is 0, report “even.” Otherwise, report “odd.”
+
+TASK 2
+Inputs: length and width.
+Process: multiply length by width.
+Output: area, in square units.
+
+TASK 3
+Equal values test whether the algorithm handles a case where neither value is larger. This can reveal a missing or unclear decision.
+
+TASK 4
+The steps may repeat forever and never reach the end.
+
+TASK 5
+Possible steps: check the class timetable, identify the next subject, pack the needed materials, review the assigned topic, and set a reminder.
+
+============================================================
+9. KEY TAKEAWAYS
+============================================================
+
+1. An algorithm is a clear, ordered, finite set of steps for a task.
+2. Describe a problem using its inputs, process, and expected outputs.
+3. Break large problems into smaller tasks.
+4. Use decisions for different conditions and repetition for repeated work.
+5. Make sure repeated steps have a clear stopping condition.
+6. Test with different examples, including equal, unusual, and boundary values.
+7. When a test fails, use the example to find and correct the problem.
+
+============================================================
+10. QUICK SELF-CHECK
+============================================================
+
+Without looking back, explain:
+
+- What an algorithm is.
+- The difference between input and output.
+- Why a loop needs a stopping condition.
+- One test case that could reveal a missing decision.
+
+Then check your explanation against this document and note one idea you want to review.
+
+END OF SAMPLE MATERIAL, ....Waaree loves u All

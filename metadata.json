@@ -1,0 +1,11 @@
+{
+  "name": "FacheeBook",
+  "description": "A focused study space for organizing course materials, tracking reading progress, revising with flashcards, and building consistent study habits. Created with care by Waaree.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
