@@ -89,12 +89,23 @@ export async function syncStudyCollection<T extends SyncItem>(
   collection: CollectionName,
   localItems: T[],
   confirmConflicts?: (count: number) => boolean,
+  signal?: AbortSignal,
 ): Promise<T[]> {
-  const { data, error } = await client
+  const query = client
     .from(collection)
     .select('id,payload,updated_at,deleted_at')
+  const { data, error } = await (signal ? query.abortSignal(signal) : query)
     .eq('user_id', userId);
-  if (error) throw new Error(`Could not load cloud ${collection === 'study_materials' ? 'materials' : 'tips'}: ${error.message}`);
+  if (error) {
+    // Handle missing deleted_at column (migration not applied)
+    if (error.message?.includes('deleted_at')) {
+      throw new Error(
+        'Cloud sync needs attention: the database table is missing a required column. ' +
+        'Please run the pending migration to add the deleted_at column to study_materials and study_tips tables.'
+      );
+    }
+    throw new Error(`Could not load cloud ${collection === 'study_materials' ? 'materials' : 'tips'}: ${error.message}`);
+  }
 
   const cloudRows = (data ?? []) as CloudRow[];
   const tombstones = readTombstones(userId, collection);
@@ -147,7 +158,8 @@ export async function syncStudyCollection<T extends SyncItem>(
   }
 
   if (upserts.length > 0) {
-    const { error: saveError } = await client.from(collection).upsert(upserts, { onConflict: 'user_id,id' });
+    const saveQuery = client.from(collection).upsert(upserts, { onConflict: 'user_id,id' });
+    const { error: saveError } = await (signal ? saveQuery.abortSignal(signal) : saveQuery);
     if (saveError) throw new Error(`Could not sync cloud ${collection === 'study_materials' ? 'materials' : 'tips'}: ${saveError.message}`);
   }
   try {

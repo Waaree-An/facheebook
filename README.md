@@ -4,6 +4,13 @@ FacheeBook
 
 FacheeBook is a student-focused learning application designed to support students with learning resources and study tools. This repository contains the existing web application, Node.js server, and Capacitor Android project.
 
+## Home and Library
+
+- **Home** is the daily starting point for continuing study, checking today's goal, seeing review reminders, and finding upcoming study events.
+- **Library** is for searching, organizing, and updating study materials.
+- Other study tools remain available in the main navigation without filling the Library screen.
+- Study-calendar entries are stored separately for each signed-in account on the same device.
+
 
 
 Technology Stack
@@ -215,18 +222,29 @@ Note: The script uses rm -rf, which is Unix-style syntax. On Windows, this may n
 Android
 
 
-
 The repository contains an android/ directory and capacitor.config.ts.
 
 
 
 Before building Android, inspect the Capacitor configuration, the Android project, and the installed Android tooling. Confirm how the web assets are built and synchronized with the native project before following the Android release workflow.
 
+Community Tips Setup
 
+Community tips and shared materials use separate Supabase tables from each student's private tips and library. After the existing study-data sync migration, apply `supabase/migrations/202610240001_community_tips.sql`, `supabase/migrations/202610240002_community_materials.sql`, `supabase/migrations/202610240003_community_material_media.sql`, and `supabase/migrations/202610240004_community_post_interactions.sql`, in order. Community sharing requires a signed-in Supabase account; local demo accounts do not publish to it. Material posts support original text summaries, a reference link, multiple YouTube/Vimeo links, photos, supported documents, and short MP4/WebM clips. Files are copied into a private community Storage bucket and remain visible only to their author and moderators until approval; they do not expose the private Library record. Approved tips and materials support persistent likes and comments. Per post, up to 20 attachments are allowed, with photos limited to 10 MB each, documents to 20 MB each, videos to 30 MB each, and total attachments to 80 MB. Supported documents are PDF, Word, PowerPoint, Excel, TXT, Markdown, and CSV.
+
+To enable moderation, add the creator's authenticated account to `public.community_moderators` from the Supabase SQL editor. Replace the email placeholder with the exact account email:
+
+```sql
+insert into public.community_moderators (user_id, role)
+select id, 'admin'
+from auth.users
+where email = lower('YOUR_ACCOUNT_EMAIL')
+on conflict (user_id) do update set role = excluded.role;
+```
+
+New community tips remain pending until a moderator approves them. Only approved tips are visible to other signed-in users. Personal tips remain separate; voice and other media are not included in this first sharing release.
 
 Environment Variables and Security
-
-
 
 Review .env.example and the server source to identify required environment variables.
 
@@ -253,6 +271,21 @@ The server loads `.env` (shared defaults) first and then `.env.local` (developer
 | `AI_MAX_ATTEMPTS` | No | Retries per model for transient upstream failures. Defaults to `3`. |
 | `AI_TIMEOUT_MS` | No | Per-request AI timeout in milliseconds. Defaults to `60000`. |
 | `PORT` | No | HTTP port for the Express server. Defaults to `3000`. |
+| `PUBLIC_SITE_URL` | For web launch | Public HTTPS origin. Enables landing-page canonical metadata and `sitemap.xml`. |
+| `VITE_API_BASE_URL` | For Android AI features | Hosted Express server origin, embedded into the web assets at build time. Leave blank for same-origin web use. |
+| `API_ALLOWED_ORIGINS` | Only for a separate web/API origin | Comma-separated exact browser origins allowed to call the API. `https://localhost` and `PUBLIC_SITE_URL` are allowed automatically. |
+
+### Android API setup
+
+The Android app runs from a local WebView origin, so relative `/api/...` requests cannot reach a hosted server. Before building a release APK or App Bundle, set `VITE_API_BASE_URL` to the hosted Express server's HTTPS origin, then rebuild the web assets and synchronize Capacitor:
+
+```powershell
+npm run build
+npx cap sync android
+.\android\gradlew.bat -p android assembleDebug --no-daemon
+```
+
+The server allows the Android app's `https://localhost` origin by default. Add any additional web-app origin to `API_ALLOWED_ORIGINS` if the web frontend and API use different hosts. CORS controls browser access only; it does not replace API authentication or rate limiting.
 
 ### AI behaviour and failure handling
 

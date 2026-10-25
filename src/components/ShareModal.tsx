@@ -62,6 +62,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({
       typeof value.pagesRead === 'number' && Number.isFinite(value.pagesRead) && value.pagesRead >= 0 && value.pagesRead <= value.totalPages &&
       Array.isArray(value.tags) && value.tags.every(isString) &&
       Array.isArray(value.keyTakeaways) && value.keyTakeaways.every(isString) &&
+      (value.keyDefinitions === undefined || (Array.isArray(value.keyDefinitions) && value.keyDefinitions.every((item) =>
+        isRecord(item) && isString(item.term) && isString(item.definition)))) &&
       isAttachmentArray(value.photos) && Array.isArray(value.videoLinks) && value.videoLinks.every((v) =>
         isRecord(v) && isString(v.id) && isString(v.title) && isString(v.url) && isString(v.platform)) &&
       isAttachmentArray(value.shortVideos) && isAttachmentArray(value.documents) &&
@@ -69,6 +71,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   };
   const isValidTip = (value: unknown): value is StudyTip => Boolean(isRecord(value) &&
     isString(value.id) && isString(value.title) && isString(value.authorName) &&
+    (value.ownerId === undefined || isString(value.ownerId)) &&
     isString(value.category) && isString(value.content) && Array.isArray(value.tags) &&
     value.tags.every(isString) && typeof value.likes === 'number' && Number.isFinite(value.likes) &&
     isString(value.createdAt));
@@ -84,6 +87,7 @@ Status: ${m.status.toUpperCase()} • Progress: ${m.pagesRead}/${m.totalPages} p
 ${m.description ? `Overview: ${m.description}\n` : ''}
 Key Exam Takeaways:
 ${m.keyTakeaways.map((t, i) => `${i + 1}. ${t}`).join('\n')}
+${m.keyDefinitions?.length ? `\nKey Definitions:\n${m.keyDefinitions.map(({ term, definition }) => `• ${term}: ${definition}`).join('\n')}` : ''}
 
 Media Attached:
 • Photos: ${m.photos.length}
@@ -210,30 +214,30 @@ Shared from FacheeBook Study Space`;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-[#111619] rounded-3xl shadow-2xl border border-slate-700 max-w-lg w-full p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150">
         
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="flex items-center justify-between border-b border-slate-700 pb-3">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+            <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-300 flex items-center justify-center font-bold">
               <Share2 className="w-4 h-4" />
             </div>
-            <h3 className="font-extrabold text-base text-slate-900">
+            <h3 className="font-extrabold text-base text-white">
               Share & Exchange Study Materials
             </h3>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700">
+          <button onClick={onClose} className="text-slate-400 hover:text-white">
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Tab Controls */}
-        <div className="flex bg-slate-100 p-1 rounded-2xl text-xs font-bold">
+        <div className="flex bg-slate-800 p-1 rounded-2xl text-xs font-bold">
           {materialToShare && (
             <button
               onClick={() => setActiveTab('card')}
               className={`flex-1 py-1.5 rounded-xl transition-all ${
-                activeTab === 'card' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600'
+                activeTab === 'card' ? 'bg-slate-700 text-indigo-300 shadow-xs' : 'text-slate-300'
               }`}
             >
               Study Card
@@ -242,7 +246,7 @@ Shared from FacheeBook Study Space`;
           <button
             onClick={() => setActiveTab('export')}
             className={`flex-1 py-1.5 rounded-xl transition-all ${
-              activeTab === 'export' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600'
+              activeTab === 'export' ? 'bg-slate-700 text-indigo-300 shadow-xs' : 'text-slate-300'
             }`}
           >
             Export All Library
@@ -250,7 +254,7 @@ Shared from FacheeBook Study Space`;
           <button
             onClick={() => setActiveTab('import')}
             className={`flex-1 py-1.5 rounded-xl transition-all ${
-              activeTab === 'import' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600'
+              activeTab === 'import' ? 'bg-slate-700 text-indigo-300 shadow-xs' : 'text-slate-300'
             }`}
           >
             Import Classmate Packet

@@ -14,7 +14,7 @@ This step adds Supabase email/password authentication, account creation, passwor
 
 ## Supabase dashboard
 
-In Authentication → URL Configuration, set the Site URL to the local development URL used by this project (`http://localhost:3000` when using the included `npm run dev` Express/Vite server). Add the same local URL to Redirect URLs. For deployed web builds, add the deployed URL. For Android, configure the intended redirect scheme/URL before testing password reset links in the WebView.
+In Authentication → URL Configuration, set the Site URL to the local development origin (`http://localhost:3000` when using the included `npm run dev` Express/Vite server). Add `http://localhost:3000/app` to Redirect URLs; password-recovery links return to this app path so the recovery session can open the new-password form. For deployed web builds, add the corresponding `https://your-domain/app` URL. For Android, configure the intended redirect scheme/URL before testing password reset links in the WebView.
 
 Email confirmation may be enabled by default. If enabled, users must click the confirmation email before password sign-in works. The built-in email sender can be rate-limited; test delivery before depending on it.
 

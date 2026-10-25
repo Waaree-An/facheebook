@@ -210,7 +210,7 @@ export const StudyRoadmap: React.FC<StudyRoadmapProps> = ({
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
       {/* Header Banner */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-[#111619] via-[#1B242A] to-[#080A0B] text-white rounded-3xl p-6 sm:p-8 shadow-md border border-indigo-800/50">
+      <div className="fb-themed-hero relative overflow-hidden bg-gradient-to-br from-[#111619] via-[#1B242A] to-[#080A0B] text-white rounded-3xl p-6 sm:p-8 shadow-md border border-indigo-800/50">
         <div className="absolute -right-12 -top-12 w-60 h-60 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -left-12 -bottom-12 w-60 h-60 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
 
@@ -402,7 +402,8 @@ export const StudyRoadmap: React.FC<StudyRoadmapProps> = ({
                 !query ||
                 m.title.toLowerCase().includes(query) ||
                 m.description.toLowerCase().includes(query) ||
-                m.author.toLowerCase().includes(query);
+                m.author.toLowerCase().includes(query) ||
+                (m.keyDefinitions || []).some(({ term, definition }) => `${term} ${definition}`.toLowerCase().includes(query));
 
               const matchesStatus = 
                 statusFilter === 'all' ||
@@ -557,7 +558,7 @@ export const StudyRoadmap: React.FC<StudyRoadmapProps> = ({
                             </div>
 
                             {/* Milestone Card Content */}
-                            <div className={`flex-1 rounded-2xl p-4 sm:p-5 border transition-all ${
+                            <div className={`min-w-0 flex-1 rounded-2xl p-3 sm:p-5 border transition-all ${
                               isReading
                                 ? 'bg-indigo-50/40 border-indigo-200 shadow-sm'
                                 : isCompleted
@@ -652,7 +653,7 @@ export const StudyRoadmap: React.FC<StudyRoadmapProps> = ({
                                 </div>
 
                                 {/* Step Action Buttons */}
-                                <div className="flex items-center md:flex-col gap-2 shrink-0 self-start md:self-stretch justify-between">
+                                <div className="flex flex-wrap items-center gap-2 shrink-0 self-start md:flex-col md:self-stretch md:justify-between">
                                   {/* Step Re-order Controls */}
                                   <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
                                     <button
@@ -688,7 +689,8 @@ export const StudyRoadmap: React.FC<StudyRoadmapProps> = ({
                                     {/* Advance Progression Button */}
                                     <button
                                       onClick={() => handleAdvanceStatus(item)}
-                                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                                      aria-label={isCompleted ? 'Review this step again' : isReading || isUnderReview ? 'Mark this step complete' : 'Start this step'}
+                                      className={`min-h-9 whitespace-nowrap px-2.5 py-1.5 rounded-xl text-[11px] sm:px-3 sm:text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
                                         isCompleted
                                           ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                                           : isReading

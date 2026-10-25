@@ -59,15 +59,37 @@ export const FlashcardsModal: React.FC<FlashcardsModalProps> = ({
   const progress = cards.length ? Math.round((answeredCount / cards.length) * 100) : 0;
 
   // Reset the study session whenever a new deck is opened or the target changes.
+  // Persisted SRS state is restored on open so a user can resume an unfinished deck.
   useEffect(() => {
-    if (isOpen) {
-      setCurrentIndex(0);
-      setIsFlipped(false);
-      setSessionRatings({});
-      setIsFinished(false);
-      setXPEarnedThisSession(0);
+    if (!isOpen) return;
+    setCurrentIndex(0);
+    setIsFlipped(false);
+    setSessionRatings({});
+    setIsFinished(false);
+    setXPEarnedThisSession(0);
+
+    try {
+      const raw = localStorage.getItem(`fachee_cardSRS_${singleMaterial?.id ?? 'all'}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+          setCardSRS(parsed as Record<string, FlashcardSRSData>);
+        }
+      }
+    } catch {
+      // Storage may be unavailable; fall back to an empty deck.
     }
   }, [isOpen, singleMaterial?.id]);
+
+  // Save cardSRS whenever it changes.
+  useEffect(() => {
+    if (!isOpen) return;
+    try {
+      localStorage.setItem(`fachee_cardSRS_${singleMaterial?.id ?? 'all'}`, JSON.stringify(cardSRS));
+    } catch {
+      // Storage may be unavailable.
+    }
+  }, [cardSRS, isOpen, singleMaterial?.id]);
 
   const goToCard = useCallback((index: number) => {
     if (index < 0 || index >= cards.length) return;
@@ -149,27 +171,27 @@ export const FlashcardsModal: React.FC<FlashcardsModalProps> = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby="flashcards-title"
-        className="flex max-h-[94dvh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+        className="flex max-h-[94dvh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-amber-300/20 bg-[#111619] shadow-2xl"
       >
-        <header className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-6">
+        <header className="flex items-start justify-between gap-2 border-b border-slate-700/80 px-3 py-3 sm:gap-3 sm:px-6 sm:py-4">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700">
               <Layers className="h-5 w-5" aria-hidden="true" />
             </div>
             <div className="min-w-0">
-              <h2 id="flashcards-title" className="text-base font-extrabold leading-tight text-slate-900 sm:text-lg">
+              <h2 id="flashcards-title" className="text-base font-extrabold leading-tight text-white sm:text-lg">
                 {singleMaterial ? 'Material flashcards' : 'Active recall'}
               </h2>
-              <p className="mt-1 truncate text-xs text-slate-500">
+              <p className="mt-1 truncate text-xs text-slate-400">
                 {singleMaterial?.title ?? 'Practice key takeaways from your reading library'}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-bold">
+            <span className="shrink-0 whitespace-nowrap px-2.5 py-1.5 sm:px-3 sm:py-1 rounded-full bg-amber-100 text-amber-700 text-[11px] sm:text-xs font-bold">
               {xpEarnedThisSession} XP
             </span>
-            <button type="button" onClick={onClose} aria-label="Close flashcards" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+            <button type="button" onClick={onClose} aria-label="Close flashcards" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -210,8 +232,8 @@ export const FlashcardsModal: React.FC<FlashcardsModalProps> = ({
                   aria-label={isFlipped ? 'Show question side' : 'Reveal the answer'}
                   className={`group relative flex w-full max-w-lg flex-col items-center justify-center gap-4 rounded-3xl border-4 p-6 shadow-xl transition-all duration-300 ${
                     isFlipped
-                      ? 'border-emerald-500 bg-gradient-to-br from-emerald-50 to-emerald-100'
-                      : 'border-amber-300 bg-gradient-to-br from-amber-50 via-white to-slate-50'
+                      ? 'border-emerald-500 bg-gradient-to-br from-emerald-900/40 to-emerald-950/30'
+                      : 'border-amber-300 bg-gradient-to-br from-[#1a2530] via-[#111619] to-[#080A0B]'
                   }`}
                 >
                   <div className="flex w-full items-center justify-between gap-2 text-[10px] font-extrabold uppercase tracking-[0.16em] sm:text-xs">
@@ -238,10 +260,10 @@ export const FlashcardsModal: React.FC<FlashcardsModalProps> = ({
               )}
 
               {!isFlipped && cards.length > 1 && (
-                <div className="mt-4 flex items-center justify-between">
-                  <button type="button" disabled={currentIndex === 0} onClick={() => goToCard(currentIndex - 1)} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-sm font-bold text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><ChevronLeft className="h-4 w-4" /> Previous</button>
-                  <span className="text-xs font-bold text-slate-400">Card {currentIndex + 1} of {cards.length}</span>
-                  <button type="button" disabled={currentIndex + 1 >= cards.length} onClick={() => goToCard(currentIndex + 1)} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-sm font-bold text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Next <ChevronRight className="h-4 w-4" /></button>
+                <div className="mt-4 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+                  <button type="button" disabled={currentIndex === 0} onClick={() => goToCard(currentIndex - 1)} className="flex min-w-0 items-center justify-center gap-1.5 whitespace-nowrap px-2 py-2 sm:gap-2 sm:px-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs sm:text-sm font-bold text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><ChevronLeft className="h-4 w-4 shrink-0" /> Previous</button>
+                  <span className="whitespace-nowrap text-[10px] sm:text-xs font-bold text-slate-400">{currentIndex + 1} / {cards.length}</span>
+                  <button type="button" disabled={currentIndex + 1 >= cards.length} onClick={() => goToCard(currentIndex + 1)} className="flex min-w-0 items-center justify-center gap-1.5 whitespace-nowrap px-2 py-2 sm:gap-2 sm:px-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs sm:text-sm font-bold text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Next <ChevronRight className="h-4 w-4 shrink-0" /></button>
                 </div>
               )}
 

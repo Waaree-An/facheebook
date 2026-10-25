@@ -58,8 +58,8 @@ export const FacheeBookLogo: React.FC<FacheeBookLogoProps> = ({
     </span>
 
     {showWordmark && (
-      <span className="text-xl font-extrabold tracking-tight text-slate-900">
-        Fachee<span className="text-sky-500">Book</span>
+      <span className="fb-wordmark whitespace-nowrap text-lg font-black leading-none text-slate-900 sm:text-xl max-[380px]:text-[15px]">
+        Fachee<span className="fb-wordmark-accent text-amber-300">Book</span>
       </span>
     )}
   </div>

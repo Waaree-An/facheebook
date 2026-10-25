@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { ReadingMaterial, FileAttachment, VideoLink, ReadingStatus } from '../types';
 import { formatBytes } from '../utils/storage';
+import { getApiUrl } from '../utils/api';
 
 interface MaterialModalProps {
   isOpen: boolean;
@@ -44,6 +45,11 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
     ]
   );
   const [newTakeawayInput, setNewTakeawayInput] = useState('');
+  const [keyDefinitions, setKeyDefinitions] = useState<NonNullable<ReadingMaterial['keyDefinitions']>>(
+    initialData?.keyDefinitions || []
+  );
+  const [newDefinitionTerm, setNewDefinitionTerm] = useState('');
+  const [newDefinitionText, setNewDefinitionText] = useState('');
 
   // Media attachments
   const [photos, setPhotos] = useState<FileAttachment[]>(initialData?.photos || []);
@@ -97,6 +103,15 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
 
   const handleRemoveTakeaway = (idx: number) => {
     setKeyTakeaways(keyTakeaways.filter((_, i) => i !== idx));
+  };
+
+  const handleAddDefinition = () => {
+    const term = newDefinitionTerm.trim();
+    const definition = newDefinitionText.trim();
+    if (!term || !definition || keyDefinitions.some((item) => item.term.toLowerCase() === term.toLowerCase())) return;
+    setKeyDefinitions((current) => [...current, { term, definition }]);
+    setNewDefinitionTerm('');
+    setNewDefinitionText('');
   };
 
   // Attachments are stored in IndexedDB as data URLs. Keep uploads bounded so
@@ -436,7 +451,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
     setAiNotice('Analyzing reading notes & structuring takeaways...');
 
     try {
-      const res = await fetch('/api/study-summary', {
+      const res = await fetch(getApiUrl('/api/study-summary'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -511,6 +526,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
       pagesRead: safePagesRead,
       tags,
       keyTakeaways,
+      keyDefinitions,
       notesMarkdown,
       photos,
       videoLinks,
@@ -532,21 +548,21 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-3xl w-full max-h-[92dvh] flex flex-col overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150">
 
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/70">
-          <div className="flex items-center gap-2.5">
+        <div className="flex items-center justify-between gap-2 px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 bg-slate-50/70">
+          <div className="flex min-w-0 items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
               <BookOpen className="w-4 h-4" />
             </div>
 
             <div>
-              <h2 className="text-lg font-extrabold text-slate-900">
+              <h2 className="text-base sm:text-lg font-extrabold text-slate-900">
                 {initialData ? 'Edit study material' : 'Add study material'}
               </h2>
 
-              <p className="text-xs text-slate-500 font-medium">
+              <p className="text-[11px] sm:text-xs text-slate-500 font-medium leading-snug">
                 Start with a title and subject. Add notes or files only when you need them.
               </p>
             </div>
@@ -563,11 +579,11 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
         </div>
 
         {/* Modal Form Scrollable Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6">
 
           {/* Section 1: Core Material Info */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
               <h3 className="text-xs font-black tracking-wider text-indigo-900 uppercase">
                 1. Material Information & Course Details
               </h3>
@@ -577,7 +593,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
                 type="button"
                 onClick={handleAISummarize}
                 disabled={isSummarizing || !title.trim()}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-all border border-indigo-200/60 cursor-pointer disabled:opacity-50"
+                className="flex w-full items-center justify-center gap-1.5 px-3 py-2 sm:w-auto sm:py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-xs font-bold transition-all border border-indigo-200/60 cursor-pointer disabled:opacity-50"
               >
                 <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
                 <span>
@@ -694,7 +710,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
 
             <details
               className="rounded-2xl border border-slate-200/80 bg-slate-50/40 p-3"
-              open={Boolean(initialData && (initialData.priority || initialData.pagesRead || initialData.description || initialData.tags?.length || initialData.notesMarkdown || initialData.keyTakeaways?.length))}
+              open={Boolean(initialData && (initialData.priority || initialData.pagesRead || initialData.description || initialData.tags?.length || initialData.notesMarkdown || initialData.keyTakeaways?.length || initialData.keyDefinitions?.length))}
             >
               <summary className="cursor-pointer select-none text-xs font-bold text-slate-700 marker:text-amber-500">
                 Add more details <span className="font-medium text-slate-500">(optional: priority, pages, notes, tags, recall points)</span>
@@ -758,7 +774,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
                 ))}
               </div>
 
-              <div className="flex gap-2">
+              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
                 <input
                   type="text"
                   value={newTakeawayInput}
@@ -769,16 +785,74 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
                       handleAddTakeaway();
                     }
                   }}
-                  placeholder="Add a key definition, formula, or exam takeaway..."
-                  className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-xl outline-none"
+                  placeholder="Add a key takeaway or exam note..."
+                  className="min-w-0 w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl outline-none"
                 />
 
                 <button
                   type="button"
                   onClick={handleAddTakeaway}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold"
+                  className="inline-flex min-h-10 shrink-0 items-center justify-center whitespace-nowrap px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold"
                 >
                   Add
+                </button>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-200 pt-4">
+              <label className="block text-xs font-bold text-slate-700 mb-2">
+                Key Definitions
+              </label>
+              <div className="space-y-2 mb-3">
+                {keyDefinitions.map((item, idx) => (
+                  <div key={`${item.term}-${idx}`} className="flex items-start gap-2 rounded-xl border border-amber-200/70 bg-amber-50/50 p-3 text-xs">
+                    <BookOpen className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-slate-900">{item.term}</p>
+                      <p className="mt-0.5 leading-relaxed text-slate-600">{item.definition}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setKeyDefinitions((current) => current.filter((_, index) => index !== idx))}
+                      aria-label={`Remove definition for ${item.term}`}
+                      className="shrink-0 rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_auto]">
+                <input
+                  type="text"
+                  value={newDefinitionTerm}
+                  onChange={(event) => setNewDefinitionTerm(event.target.value)}
+                  placeholder="Term or concept"
+                  aria-label="Definition term"
+                  className="min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-amber-400"
+                />
+                <input
+                  type="text"
+                  value={newDefinitionText}
+                  onChange={(event) => setNewDefinitionText(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      handleAddDefinition();
+                    }
+                  }}
+                  placeholder="Concise definition"
+                  aria-label="Definition text"
+                  className="min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-amber-400"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddDefinition}
+                  disabled={!newDefinitionTerm.trim() || !newDefinitionText.trim()}
+                  className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-amber-100 px-3 py-2 text-xs font-bold text-amber-900 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add definition
                 </button>
               </div>
             </div>
@@ -901,20 +975,20 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
           {/* Section 2: Photos & Book Diagrams */}
           <div className="space-y-3">
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-start justify-start gap-2 text-left">
                 <Image className="w-4 h-4 text-indigo-600" />
 
-                <h3 className="text-xs font-black tracking-wider text-slate-800 uppercase">
+                <h3 className="min-w-0 text-left text-xs font-black tracking-wider text-slate-800 uppercase">
                   2. Photos & Textbook Diagrams ({photos.length})
                 </h3>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:flex sm:items-center">
                 <button
                   type="button"
                   onClick={() => startCamera('photo')}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold"
+                  className="flex min-w-0 items-center justify-center gap-1 px-2 py-2 sm:px-2.5 sm:py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-[10px] sm:text-xs font-semibold"
                 >
                   <Camera className="w-3.5 h-3.5" />
                   <span>Snap Photo</span>
@@ -924,7 +998,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
                   type="button"
                   onClick={() => photoInputRef.current?.click()}
                   disabled={isProcessingAttachments}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold disabled:opacity-50"
+                  className="flex min-w-0 items-center justify-center gap-1 px-2 py-2 sm:px-2.5 sm:py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-[10px] sm:text-xs font-semibold disabled:opacity-50"
                 >
                   <UploadCloud className="w-3.5 h-3.5" />
                   <span>Upload Photos</span>
@@ -1076,20 +1150,20 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
           {/* Section 4: Short Videos */}
           <div className="space-y-3">
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-start justify-start gap-2 text-left">
                 <Video className="w-4 h-4 text-emerald-600" />
 
-                <h3 className="text-xs font-black tracking-wider text-slate-800 uppercase">
+                <h3 className="min-w-0 text-left text-xs font-black tracking-wider text-slate-800 uppercase">
                   4. Short Videos ({shortVideos.length})
                 </h3>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:flex sm:items-center">
                 <button
                   type="button"
                   onClick={() => startCamera('short_video')}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold"
+                  className="flex min-w-0 items-center justify-center gap-1 px-2 py-2 sm:px-2.5 sm:py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-[10px] sm:text-xs font-semibold"
                 >
                   <Camera className="w-3.5 h-3.5" />
                   <span>Record Short Clip</span>
@@ -1099,7 +1173,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
                   type="button"
                   onClick={() => shortVideoInputRef.current?.click()}
                   disabled={isProcessingAttachments}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold disabled:opacity-50"
+                  className="flex min-w-0 items-center justify-center gap-1 px-2 py-2 sm:px-2.5 sm:py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-[10px] sm:text-xs font-semibold disabled:opacity-50"
                 >
                   <UploadCloud className="w-3.5 h-3.5" />
                   <span>Upload Short Video</span>
@@ -1176,7 +1250,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
           {/* Section 5: Document Files of ANY format */}
           <div className="space-y-3">
 
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-purple-600" />
 
@@ -1189,7 +1263,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
                 type="button"
                 onClick={() => docInputRef.current?.click()}
                 disabled={isProcessingAttachments}
-                className="flex items-center gap-1 px-3 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-semibold disabled:opacity-50"
+                className="flex w-full items-center justify-center gap-1 px-3 py-2 sm:w-auto sm:py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-xs font-semibold disabled:opacity-50"
               >
                 <UploadCloud className="w-3.5 h-3.5" />
                 <span>Upload Any Documents</span>
@@ -1260,13 +1334,13 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
           </div>
 
           {/* Modal Footer Buttons */}
-          <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-3">
+          <div className="pt-4 border-t border-slate-200 flex flex-col-reverse items-stretch justify-end gap-2 sm:flex-row sm:items-center sm:gap-3">
 
             <button
               type="button"
               onClick={handleClose}
               disabled={isProcessingAttachments}
-              className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50"
+              className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50 sm:w-auto"
             >
               Cancel
             </button>
@@ -1274,7 +1348,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
             <button
               type="submit"
               disabled={isProcessingAttachments || isRecordingVideo}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto"
             >
               <Check className="w-4 h-4" />
 

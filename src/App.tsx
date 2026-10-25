@@ -11,6 +11,7 @@ interface GamificationStatDelta {
 import { INITIAL_READING_MATERIALS, INITIAL_STUDY_TIPS } from './utils/initialData';
 import { loadMaterialsFromDB, saveMaterialsToDB, loadTipsFromDB, saveTipsToDB } from './utils/storage';
 import { Navbar } from './components/Navbar';
+import { FacheeBookLogo } from './components/FacheeBookLogo';
 import { MaterialCard } from './components/MaterialCard';
 import { DashboardAlertBanner } from './components/DashboardAlertBanner';
 import { DailyStudyGoalTracker } from './components/DailyStudyGoalTracker';
@@ -24,7 +25,7 @@ import {
 import { 
   Search, Filter, Plus, BookOpen, Layers, Lightbulb, X, Target, Library,
   Sparkles, CheckCircle2, Image, Video, FileText, Link2, 
-  Flame, Clock, ArrowUpDown, BellRing, Bell, AlertTriangle,
+  Flame, Clock, ArrowUpDown, BellRing, Bell, AlertTriangle, House,
   Heart, Youtube, Facebook, ExternalLink, Route, Trophy, Zap, ZapIcon, Timer, CalendarDays, Award
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
@@ -33,8 +34,15 @@ import { QuizGenerator } from './components/QuizGenerator';
 import { StudyCalendar } from './components/StudyCalendar';
 import type { StudyCalendarEvent } from './types';
 import { useFacheeAuth } from './lib/AuthGate';
+import { isLocalDemoSession } from './lib/localDemoAuth';
 import { supabase } from './lib/supabase';
 import { recordStudyDeletion, syncStudyCollection } from './utils/cloudStudySync';
+import {
+  applyThemePreference,
+  getThemePreference,
+  saveThemePreference,
+  type ThemePreference,
+} from './utils/theme';
 import { 
   createDefaultGamification, 
   addXP, 
@@ -46,18 +54,52 @@ import {
 const MaterialModal = lazy(() => import('./components/MaterialModal').then((module) => ({ default: module.MaterialModal })));
 const MaterialDetailView = lazy(() => import('./components/MaterialDetailView').then((module) => ({ default: module.MaterialDetailView })));
 const StudyTipsHub = lazy(() => import('./components/StudyTipsHub').then((module) => ({ default: module.StudyTipsHub })));
+const CommunityTipsHub = lazy(() => import('./components/CommunityTipsHub').then((module) => ({ default: module.CommunityTipsHub })));
+const CommunityMaterialsHub = lazy(() => import('./components/CommunityMaterialsHub').then((module) => ({ default: module.CommunityMaterialsHub })));
 const FlashcardsModal = lazy(() => import('./components/FlashcardsModal').then((module) => ({ default: module.FlashcardsModal })));
 const StudyTimerModal = lazy(() => import('./components/StudyTimerModal').then((module) => ({ default: module.StudyTimerModal })));
 const ShareModal = lazy(() => import('./components/ShareModal').then((module) => ({ default: module.ShareModal })));
 const AboutSection = lazy(() => import('./components/AboutSection').then((module) => ({ default: module.AboutSection })));
 const StudyRoadmap = lazy(() => import('./components/StudyRoadmap').then((module) => ({ default: module.StudyRoadmap })));
 const StudentRegistrationModal = lazy(() => import('./components/StudentRegistrationModal').then((module) => ({ default: module.StudentRegistrationModal })));
+const SettingsModal = lazy(() => import('./components/SettingsModal').then((module) => ({ default: module.SettingsModal })));
+
+async function withCloudSyncTimeout<T>(sync: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  let timedOut = false;
+  const timeout = window.setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, 15_000);
+  try {
+    return await sync(controller.signal);
+  } catch (error) {
+    if (timedOut) throw new Error('Cloud sync took too long. Check your connection and try again.');
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
 
 export default function App() {
   const { session, signOut } = useFacheeAuth();
+  const isLocalDemoUser = isLocalDemoSession(session);
   const loadingFallback = (
-    <div role="status" className="flex min-h-32 items-center justify-center text-sm font-semibold text-slate-500">
-      Loading study tools…
+    <div role="status" aria-live="polite" className="flex min-h-56 items-center justify-center px-4 py-8">
+      <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-amber-200 border-t-amber-500 animate-spin" aria-hidden="true" />
+          <div>
+            <p className="font-bold text-slate-900">Getting your study tools ready</p>
+            <p className="mt-1 text-xs text-slate-500">This should only take a moment.</p>
+          </div>
+        </div>
+        <div className="mt-5 space-y-2.5" aria-hidden="true">
+          <div className="h-2.5 w-full animate-pulse rounded-full bg-slate-100" />
+          <div className="h-2.5 w-4/5 animate-pulse rounded-full bg-slate-100" />
+          <div className="h-2.5 w-2/3 animate-pulse rounded-full bg-slate-100" />
+        </div>
+      </div>
     </div>
   );
   // Core State
@@ -66,6 +108,7 @@ export default function App() {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [cloudReady, setCloudReady] = useState(false);
   const [cloudSyncError, setCloudSyncError] = useState('');
+  const [isRetryingSync, setIsRetryingSync] = useState(false);
   const [syncRequest, setSyncRequest] = useState(0);
   
   // Gamification State
@@ -95,9 +138,43 @@ export default function App() {
   const [legacyImportUsed, setLegacyImportUsed] = useState(() => {
     try { return localStorage.getItem('fachee_legacy_imported') === '1'; } catch { return false; }
   });
-  const dataScope = session?.user?.id ? `account_${session.user.id}` : 'local';
-  const [currentTab, setCurrentTab] = useState<'materials' | 'roadmap' | 'tips' | 'flashcards' | 'about'>('materials');
+  const dataScope = isLocalDemoUser || !session?.user?.id ? 'local' : `account_${session.user.id}`;
+  const [currentTab, setCurrentTab] = useState<'home' | 'materials' | 'roadmap' | 'tips' | 'flashcards' | 'about'>('home');
   const [selectedMaterialDetail, setSelectedMaterialDetail] = useState<ReadingMaterial | null>(null);
+  const [areNavigationBarsHidden, setAreNavigationBarsHidden] = useState(false);
+  const [isMobileDockVisible, setIsMobileDockVisible] = useState(false);
+  const previousScrollYRef = useRef(0);
+  const scrollDirectionRef = useRef<'up' | 'down' | null>(null);
+  const scrollDirectionStartRef = useRef(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollY = window.scrollY;
+
+      if (scrollY < 72) {
+        setAreNavigationBarsHidden(false);
+        setIsMobileDockVisible(false);
+        scrollDirectionRef.current = null;
+        scrollDirectionStartRef.current = scrollY;
+      } else if (scrollY !== previousScrollYRef.current) {
+        const direction = scrollY > previousScrollYRef.current ? 'down' : 'up';
+        if (scrollDirectionRef.current !== direction) {
+          scrollDirectionRef.current = direction;
+          scrollDirectionStartRef.current = previousScrollYRef.current;
+        }
+        if (Math.abs(scrollY - scrollDirectionStartRef.current) >= 120) {
+          setAreNavigationBarsHidden(direction === 'down');
+          setIsMobileDockVisible(direction === 'down');
+          scrollDirectionStartRef.current = scrollY;
+        }
+      }
+
+      previousScrollYRef.current = scrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Inactivity Alert System State
   const [alertThresholdDays, setAlertThresholdDays] = useState<number>(() => {
@@ -127,50 +204,72 @@ export default function App() {
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [isTimerModalOpen, setIsTimerModalOpen] = useState(false);
 
-  // Study Calendar State (persisted locally per account scope)
-  const [calendarEvents, setCalendarEvents] = useState<StudyCalendarEvent[]>(() => {
+  // Keep study-calendar data separate between signed-in accounts on shared devices.
+  const [calendarState, setCalendarState] = useState<{ scope: string; events: StudyCalendarEvent[] }>(() => {
     try {
-      const saved = localStorage.getItem('fachee_calendar_events');
+      const key = dataScope === 'local' ? 'fachee_calendar_events' : `fachee_calendar_events_${dataScope}`;
+      const saved = localStorage.getItem(key);
       const parsed = saved ? JSON.parse(saved) : [];
-      return Array.isArray(parsed) ? (parsed as StudyCalendarEvent[]) : [];
+      return { scope: dataScope, events: Array.isArray(parsed) ? parsed as StudyCalendarEvent[] : [] };
     } catch {
-      return [];
+      return { scope: dataScope, events: [] };
     }
   });
+  const calendarEvents = calendarState.scope === dataScope ? calendarState.events : [];
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   const persistCalendarEvents = useCallback((events: StudyCalendarEvent[]) => {
     try {
-      localStorage.setItem('fachee_calendar_events', JSON.stringify(events));
-    } catch { /* storage may be restricted */ }
-  }, []);
+      const key = dataScope === 'local' ? 'fachee_calendar_events' : `fachee_calendar_events_${dataScope}`;
+      localStorage.setItem(key, JSON.stringify(events));
+    } catch (error) {
+      console.error('Could not save study-calendar events', error);
+    }
+  }, [dataScope]);
+
+  useEffect(() => {
+    try {
+      const key = dataScope === 'local' ? 'fachee_calendar_events' : `fachee_calendar_events_${dataScope}`;
+      const saved = localStorage.getItem(key);
+      const parsed = saved ? JSON.parse(saved) : [];
+      setCalendarState({ scope: dataScope, events: Array.isArray(parsed) ? parsed as StudyCalendarEvent[] : [] });
+    } catch (error) {
+      console.error('Could not load study-calendar events', error);
+      setCalendarState({ scope: dataScope, events: [] });
+    }
+  }, [dataScope]);
 
   const handleAddCalendarEvent = useCallback((event: StudyCalendarEvent) => {
-    setCalendarEvents((prev) => {
-      const next = [...prev, event];
+    setCalendarState((previous) => {
+      const current = previous.scope === dataScope ? previous.events : [];
+      const next = [...current, event];
       persistCalendarEvents(next);
-      return next;
+      return { scope: dataScope, events: next };
     });
-  }, [persistCalendarEvents]);
+  }, [dataScope, persistCalendarEvents]);
 
   const handleDeleteCalendarEvent = useCallback((id: string) => {
-    setCalendarEvents((prev) => {
-      const next = prev.filter((e) => e.id !== id);
+    setCalendarState((previous) => {
+      const current = previous.scope === dataScope ? previous.events : [];
+      const next = current.filter((e) => e.id !== id);
       persistCalendarEvents(next);
-      return next;
+      return { scope: dataScope, events: next };
     });
-  }, [persistCalendarEvents]);
+  }, [dataScope, persistCalendarEvents]);
 
   const handleToggleCalendarEvent = useCallback((id: string) => {
-    setCalendarEvents((prev) => {
-      const next = prev.map((e) => (e.id === id ? { ...e, completed: !e.completed } : e));
+    setCalendarState((previous) => {
+      const current = previous.scope === dataScope ? previous.events : [];
+      const next = current.map((e) => (e.id === id ? { ...e, completed: !e.completed } : e));
       persistCalendarEvents(next);
-      return next;
+      return { scope: dataScope, events: next };
     });
-  }, [persistCalendarEvents]);
+  }, [dataScope, persistCalendarEvents]);
 
   // Student Registration & Profile State
   const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [themePreference, setThemePreference] = useState<ThemePreference>(getThemePreference);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(() => {
     try {
@@ -182,13 +281,31 @@ export default function App() {
       return null;
     }
   });
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const apply = () => applyThemePreference(themePreference, media.matches);
+    apply();
+    if (themePreference !== 'system') return;
+    media.addEventListener('change', apply);
+    return () => media.removeEventListener('change', apply);
+  }, [themePreference]);
+
+  const handleThemePreferenceChange = (preference: ThemePreference) => {
+    try {
+      saveThemePreference(preference);
+      setThemePreference(preference);
+    } catch (error) {
+      console.error('Could not save the appearance preference', error);
+      window.alert('The appearance preference could not be saved on this device.');
+    }
+  };
 
   // Cloud profile is the source of truth when signed in. Local storage remains a
   // cache/fallback so existing profiles are not discarded during migration.
   useEffect(() => {
     let cancelled = false;
     async function loadCloudProfile() {
-      if (!session?.user || !supabase) return;
+      if (!session?.user || !supabase || isLocalDemoUser) return;
       const { data, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
       if (error) { console.error('Could not load cloud student profile', error); return; }
       if (cancelled) return;
@@ -225,6 +342,12 @@ export default function App() {
   }, [session?.user?.id]);
 
   const handleSaveProfile = async (profile: StudentProfile): Promise<StudentProfile> => {
+    if (isLocalDemoUser) {
+      const localProfile = { ...profile, id: session?.user?.id || 'local-demo-profile', updatedAt: new Date().toISOString() };
+      setStudentProfile(localProfile);
+      try { localStorage.setItem('fachee_student_profile', JSON.stringify(localProfile)); } catch { /* optional cache */ }
+      return localProfile;
+    }
     if (!session?.user || !supabase) throw new Error('Please sign in to save your student profile to the cloud. Your changes were not saved.');
     const payload = {
       id: session.user.id,
@@ -296,7 +419,13 @@ export default function App() {
 
   // Pomodoro Study Timer State
   const localDateKey = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-  const readSavedTimer = () => {
+  const readSavedTimer = (): {
+    active: boolean;
+    mode: 'focus' | 'break';
+    secondsRemaining: number;
+    deadline: number | null;
+    completedPomodoros: number;
+  } | null => {
     try {
       const raw = localStorage.getItem('fachee_study_timer_v1');
       if (!raw) return null;
@@ -305,7 +434,7 @@ export default function App() {
         deadline?: number | null; completedPomodoros?: number; countDate?: string;
       };
       const today = localDateKey();
-      let mode = parsed.mode === 'break' ? 'break' : 'focus';
+      let mode: 'focus' | 'break' = parsed.mode === 'break' ? 'break' : 'focus';
       const deadline = typeof parsed.deadline === 'number' ? parsed.deadline : null;
       const wasRunning = Boolean(parsed.active && deadline);
       const expired = Boolean(wasRunning && deadline && deadline <= Date.now());
@@ -357,10 +486,19 @@ export default function App() {
         if (cancelled) return;
         let nextMaterials = savedMaterials ?? (session?.user ? [] : INITIAL_READING_MATERIALS);
         let nextTips = savedTips ?? (session?.user ? [] : INITIAL_STUDY_TIPS);
-        if (session?.user && supabase) {
+        if (session?.user && supabase && !isLocalDemoUser) {
           try {
-            nextMaterials = await syncStudyCollection(supabase, session.user.id, 'study_materials', nextMaterials, confirmSyncConflicts);
-            nextTips = await syncStudyCollection(supabase, session.user.id, 'study_tips', nextTips, confirmSyncConflicts);
+            const syncedCollections = await withCloudSyncTimeout(async (signal) => {
+              const syncedMaterials = await syncStudyCollection(
+                supabase, session.user.id, 'study_materials', nextMaterials, confirmSyncConflicts, signal,
+              );
+              const syncedTips = await syncStudyCollection(
+                supabase, session.user.id, 'study_tips', nextTips, confirmSyncConflicts, signal,
+              );
+              return { syncedMaterials, syncedTips };
+            });
+            nextMaterials = syncedCollections.syncedMaterials;
+            nextTips = syncedCollections.syncedTips;
             if (cancelled) return;
             setCloudReady(true);
           } catch (error) {
@@ -368,6 +506,9 @@ export default function App() {
             console.error('Initial study-data cloud sync failed', error);
             setCloudSyncError(error instanceof Error ? error.message : 'Cloud sync failed. Your account data remains available on this device.');
           }
+        } else if (session?.user && isLocalDemoUser) {
+          setCloudReady(false);
+          setCloudSyncError('');
         }
         setMaterials(nextMaterials);
         setTips(nextTips);
@@ -408,7 +549,7 @@ export default function App() {
   }, [tips, dataLoaded, dataScope]);
 
   useEffect(() => {
-    if (!dataLoaded || !cloudReady || !session?.user || !supabase) return;
+    if (!dataLoaded || !cloudReady || !session?.user || !supabase || isLocalDemoUser) return;
     let cancelled = false;
     const timeout = window.setTimeout(async () => {
       try {
@@ -433,7 +574,7 @@ export default function App() {
   }, [materials, tips, dataLoaded, cloudReady, session?.user?.id, syncRequest]);
 
   useEffect(() => {
-    if (!cloudReady || !session?.user) return;
+    if (!cloudReady || !session?.user || isLocalDemoUser) return;
     const refreshWhenVisible = () => {
       if (document.visibilityState === 'visible') setSyncRequest((count) => count + 1);
     };
@@ -817,6 +958,10 @@ export default function App() {
     setTips((current) => [{ ...newTip, updatedAt: new Date().toISOString() }, ...current]);
   };
 
+  const handleUpdateTip = (updatedTip: StudyTip) => {
+    setTips((current) => current.map((tip) => tip.id === updatedTip.id ? updatedTip : tip));
+  };
+
   const handleLikeTip = (id: string) => {
     setTips((current) => current.map((tip) => {
       if (tip.id !== id) return tip;
@@ -829,6 +974,19 @@ export default function App() {
       };
     }));
   };
+
+    const handleDeleteTip = (id: string) => {
+      const deletedTip = tips.find((tip) => tip.id === id);
+      if (session?.user && deletedTip) {
+        try {
+          recordStudyDeletion(session.user.id, 'study_tips', deletedTip.id);
+        } catch (error) {
+          window.alert(error instanceof Error ? error.message : 'Could not record this deletion for cloud sync.');
+          return;
+        }
+      }
+      setTips((current) => current.filter((tip) => tip.id !== id));
+    };
 
   const handleImportLegacyDeviceData = async () => {
     if (!session?.user) return;
@@ -955,6 +1113,14 @@ export default function App() {
     handleSetThresholdDays(1);
   };
 
+  const handleMobileTabClick = (tab: 'home' | 'materials' | 'roadmap') => {
+    if (currentTab === tab) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    setCurrentTab(tab);
+  };
+
   // Subject list from existing materials
   const availableSubjects = Array.from(new Set(materials.map((m) => m.subject).filter(Boolean)));
 
@@ -976,6 +1142,7 @@ export default function App() {
         (m.description || '').toLowerCase().includes(query) ||
         m.tags.some((t) => t.toLowerCase().includes(query)) ||
         (m.keyTakeaways || []).some((takeaway) => takeaway.toLowerCase().includes(query)) ||
+        (m.keyDefinitions || []).some(({ term, definition }) => `${term} ${definition}`.toLowerCase().includes(query)) ||
         m.documents.some((d) => d.name.toLowerCase().includes(query)) ||
         m.videoLinks.some((video) => `${video.title} ${video.url} ${video.notes || ''}`.toLowerCase().includes(query)) ||
         m.shortVideos.some((video) => `${video.name} ${video.format}`.toLowerCase().includes(query));
@@ -1009,28 +1176,66 @@ export default function App() {
       // default: updated
       return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     });
+  const currentStudyMaterial = materials.find((material) => material.status === 'reading') ?? materials[0];
+  const upcomingStudyEvents = calendarEvents
+    .filter((event) => !event.completed && event.date >= localDateKey())
+    .sort((left, right) => `${left.date} ${left.startTime ?? ''}`.localeCompare(`${right.date} ${right.startTime ?? ''}`))
+    .slice(0, 3);
 
   const handleRetryCloudSync = async () => {
-    if (!session?.user || !supabase) return;
+    if (!session?.user || !supabase || isRetryingSync) return;
+    setIsRetryingSync(true);
     setCloudSyncError('');
     try {
       const [localMaterials, localTips] = await Promise.all([
         loadMaterialsFromDB(dataScope),
         loadTipsFromDB(dataScope),
       ]);
-      const mergedMaterials = await syncStudyCollection(supabase, session.user.id, 'study_materials', localMaterials ?? [], confirmSyncConflicts);
-      const mergedTips = await syncStudyCollection(supabase, session.user.id, 'study_tips', localTips ?? [], confirmSyncConflicts);
-      setMaterials(mergedMaterials);
-      setTips(mergedTips);
+      const mergedCollections = await withCloudSyncTimeout(async (signal) => {
+        const mergedMaterials = await syncStudyCollection(
+          supabase, session.user.id, 'study_materials', localMaterials ?? [], confirmSyncConflicts, signal,
+        );
+        const mergedTips = await syncStudyCollection(
+          supabase, session.user.id, 'study_tips', localTips ?? [], confirmSyncConflicts, signal,
+        );
+        return { mergedMaterials, mergedTips };
+      });
+      setMaterials(mergedCollections.mergedMaterials);
+      setTips(mergedCollections.mergedTips);
       setCloudReady(true);
     } catch (error) {
       console.error('Manual study-data cloud sync failed', error);
       setCloudSyncError(error instanceof Error ? error.message : 'Cloud sync failed. Please try again.');
+    } finally {
+      setIsRetryingSync(false);
     }
   };
 
   if (!dataLoaded) {
-    return <div role="status" className="flex min-h-screen items-center justify-center bg-[#080A0B] text-sm font-semibold text-amber-200">Loading your study library…</div>;
+    return (
+      <main role="status" aria-live="polite" className="flex min-h-screen items-center justify-center bg-[radial-gradient(ellipse_at_top,rgba(244,199,91,.12),transparent_50%),#080a0b] px-4 py-10 text-stone-100">
+        <section className="w-full max-w-md rounded-3xl border border-amber-300/20 bg-[#111619]/95 p-6 shadow-2xl shadow-black/40 sm:p-8">
+          <FacheeBookLogo className="justify-center" />
+          <div className="mt-8 flex flex-col items-center text-center">
+            <span className="relative flex h-14 w-14 items-center justify-center" aria-hidden="true">
+              <span className="absolute inset-0 rounded-full border-2 border-amber-300/20" />
+              <span className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-amber-300" />
+              <BookOpen className="h-5 w-5 text-amber-200" />
+            </span>
+            <h1 className="mt-5 text-lg font-extrabold text-white">Preparing your study space</h1>
+            <p className="mt-2 max-w-xs text-sm leading-6 text-stone-300">
+              Restoring your saved materials and connecting your account. Your library will be ready shortly.
+            </p>
+          </div>
+          <div className="mt-7 space-y-3" aria-hidden="true">
+            <div className="h-2.5 w-full animate-pulse rounded-full bg-white/10" />
+            <div className="h-2.5 w-4/5 animate-pulse rounded-full bg-white/10" />
+            <div className="h-2.5 w-2/3 animate-pulse rounded-full bg-white/10" />
+          </div>
+          <p className="mt-6 text-center text-[11px] font-semibold tracking-wide text-amber-200/70">PLEASE KEEP THIS PAGE OPEN</p>
+        </section>
+      </main>
+    );
   }
 
   return (
@@ -1038,6 +1243,11 @@ export default function App() {
       
       {/* Top Navigation */}
       <Navbar
+        isNavigationHidden={areNavigationBarsHidden}
+        onRevealNavigation={() => {
+          setAreNavigationBarsHidden(false);
+          setIsMobileDockVisible(false);
+        }}
         materials={materials}
         currentTab={currentTab}
         onSelectTab={(tab) => {
@@ -1063,6 +1273,7 @@ export default function App() {
         isAuthenticated={Boolean(session?.user)}
         isSigningOut={isSigningOut}
         onOpenRegistrationModal={() => setIsRegistrationModalOpen(true)}
+        onOpenSettings={() => setIsSettingsModalOpen(true)}
         onSignOut={handleSignOut}
         alerts={inactivityAlerts}
         thresholdDays={alertThresholdDays}
@@ -1077,27 +1288,6 @@ export default function App() {
         }}
         onSimulateInactivity={handleSimulateInactivity}
       />
-
-      {session?.user && (
-        <section className="mx-auto mt-4 flex w-full max-w-7xl flex-col gap-3 px-4 sm:px-6" aria-label="Cloud sync status">
-          <div className={`flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center sm:justify-between ${cloudSyncError ? 'border-red-200 bg-red-50 text-red-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}>
-            <div>
-              <p className="text-sm font-bold">{cloudSyncError ? 'Cloud sync needs attention' : cloudReady ? 'Cloud sync is on' : 'Connecting your study library…'}</p>
-              <p className="mt-1 text-xs">{cloudSyncError || 'Materials and study tips sync for this account. File attachments and voice recordings stay on this device.'}</p>
-            </div>
-            {cloudSyncError && <button type="button" onClick={() => void handleRetryCloudSync()} className="shrink-0 rounded-xl border border-current px-3 py-2 text-xs font-bold">Retry sync</button>}
-          </div>
-          {legacyDataAvailable && !legacyImportUsed && (
-            <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-bold">Import this device’s existing library?</p>
-                <p className="mt-1 text-xs">Your signed-in library is separate. Importing merges local materials and tips into this account; the original local library is kept.</p>
-              </div>
-              <button type="button" onClick={() => void handleImportLegacyDeviceData()} className="shrink-0 rounded-xl bg-amber-300 px-3 py-2 text-xs font-bold text-slate-950">Review and import</button>
-            </div>
-          )}
-        </section>
-      )}
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 fb-main">
@@ -1127,6 +1317,158 @@ export default function App() {
               }}
             />
           </Suspense>
+        ) : currentTab === 'home' ? (
+          <div className="space-y-6">
+            <section className="fb-home-hero rounded-3xl border border-amber-300/25 bg-gradient-to-br from-[#111619] via-[#1B242A] to-[#080A0B] p-6 shadow-xl shadow-black/20 sm:p-8">
+              <p className="text-xs font-bold uppercase tracking-wider text-amber-300">Your study space</p>
+              <h1 className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">
+                {studentProfile?.firstName ? `Welcome, ${studentProfile.firstName}` : 'What would you like to study today?'}
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+                Choose one small step. Your materials and study tools are ready when you are.
+              </p>
+              <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                {currentStudyMaterial ? (
+                  <button type="button" onClick={() => setSelectedMaterialDetail(currentStudyMaterial)} className="col-span-2 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-amber-300 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 sm:col-span-1 sm:w-auto">
+                    <BookOpen size={17} /> Continue studying
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => { setEditingMaterial(null); setIsAddModalOpen(true); }} className="col-span-2 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-amber-300 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 sm:col-span-1 sm:w-auto">
+                    <Plus size={17} /> Add study material
+                  </button>
+                )}
+                <button type="button" onClick={() => setCurrentTab('materials')} aria-label="Browse study library" className="fb-home-secondary inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 sm:px-4 sm:text-sm">
+                  <Library size={17} /> Library
+                </button>
+                <button type="button" onClick={() => setIsTimerModalOpen(true)} className="fb-home-secondary inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 sm:px-4 sm:text-sm">
+                  <Clock size={17} /> Focus timer
+                </button>
+              </div>
+            </section>
+
+            {session?.user && (
+              <div className={`fb-sync-status rounded-2xl border p-4 text-sm ${cloudSyncError ? 'is-error border-red-200 bg-red-50 text-red-900' : isLocalDemoUser ? 'is-local border-amber-200 bg-amber-50 text-amber-950' : 'is-ready border-emerald-200 bg-emerald-50 text-emerald-900'}`}>
+                <p className="flex items-center gap-2 font-bold">
+                  {cloudSyncError
+                    ? <AlertTriangle className="h-4 w-4 shrink-0" />
+                    : cloudReady || isLocalDemoUser
+                      ? <CheckCircle2 className="h-4 w-4 shrink-0" />
+                      : <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-current/25 border-t-current" aria-hidden="true" />}
+                  {cloudSyncError
+                    ? 'Cloud sync needs attention'
+                    : isLocalDemoUser
+                      ? 'Your local library is ready'
+                      : cloudReady
+                        ? 'Your library is up to date'
+                        : 'Connecting to your cloud library…'}
+                </p>
+                <p className="mt-1 text-xs">
+                  {cloudSyncError || (isLocalDemoUser
+                    ? 'This library is saved on this device. Sign in to sync materials and study tips across devices.'
+                    : 'Materials and study tips sync for this account. Attachments and voice recordings stay on this device.')}
+                </p>
+                {cloudSyncError && (
+                  <button
+                    type="button"
+                    onClick={() => void handleRetryCloudSync()}
+                    disabled={isRetryingSync}
+                    aria-busy={isRetryingSync}
+                    className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg border border-current px-3 py-1.5 text-xs font-bold disabled:cursor-wait disabled:opacity-70"
+                  >
+                    {isRetryingSync && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current/30 border-t-current" aria-hidden="true" />}
+                    {isRetryingSync ? 'Syncing your library…' : 'Try syncing again'}
+                  </button>
+                )}
+              </div>
+            )}
+            {session?.user && legacyDataAvailable && !legacyImportUsed && (
+              <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold">Import this device’s existing library?</p>
+                  <p className="mt-1 text-xs">Your signed-in library is separate. Importing keeps the original local library.</p>
+                </div>
+                <button type="button" onClick={() => void handleImportLegacyDeviceData()} className="shrink-0 rounded-xl bg-amber-300 px-3 py-2 text-xs font-bold text-slate-950">Review and import</button>
+              </div>
+            )}
+
+            <section className="fb-overview-grid" aria-label="Study progress">
+              <div className="fb-overview-card fb-overview-primary">
+                <span className="fb-overview-icon"><Library size={18} /></span>
+                <div><p className="fb-overview-label">Library</p><strong>{materials.length}</strong><small>saved materials</small></div>
+              </div>
+              <div className="fb-overview-card">
+                <span className="fb-overview-icon"><BookOpen size={18} /></span>
+                <div><p className="fb-overview-label">In progress</p><strong>{materials.filter((material) => material.status === 'reading').length}</strong><small>currently studying</small></div>
+              </div>
+              <div className="fb-overview-card">
+                <span className="fb-overview-icon"><CheckCircle2 size={18} /></span>
+                <div><p className="fb-overview-label">Completed</p><strong>{materials.filter((material) => material.status === 'completed').length}</strong><small>finished materials</small></div>
+              </div>
+              <div className="fb-overview-card">
+                <span className="fb-overview-icon"><BellRing size={18} /></span>
+                <div><p className="fb-overview-label">Review due</p><strong>{inactivityAlerts.length}</strong><small>materials to revisit</small></div>
+              </div>
+            </section>
+
+            <DailyStudyGoalTracker
+              goal={dailyGoal}
+              materials={materials}
+              onUpdateGoal={handleUpdateDailyGoal}
+              onOpenMaterial={(material) => setSelectedMaterialDetail(material)}
+            />
+
+            {inactivityAlerts.length > 0 && (
+              <DashboardAlertBanner
+                alerts={inactivityAlerts}
+                thresholdDays={alertThresholdDays}
+                onSetThresholdDays={handleSetThresholdDays}
+                onOpenMaterial={(material) => setSelectedMaterialDetail(material)}
+                onUpdateStatus={(id, newStatus) => {
+                  const currentMaterial = materials.find((material) => material.id === id);
+                  handleUpdateProgress(id, currentMaterial ? currentMaterial.pagesRead : 0, newStatus);
+                }}
+                onRefreshActivity={handleRefreshActivity}
+                onStartTimer={handleStartTimerForMaterial}
+                onFilterInactiveOnly={() => { setFilterInactiveOnly(true); setCurrentTab('materials'); }}
+                isFilteredByInactive={filterInactiveOnly}
+              />
+            )}
+
+            <div className="grid gap-5 lg:grid-cols-2">
+              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-base font-extrabold text-slate-900">Coming up</h2>
+                    <p className="mt-1 text-xs text-slate-500">Your next exams, deadlines, and study sessions.</p>
+                  </div>
+                  <button type="button" onClick={() => setIsCalendarOpen(true)} className="min-h-10 rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">
+                    <CalendarDays className="mr-1 inline h-4 w-4" /> Study plan
+                  </button>
+                </div>
+                {upcomingStudyEvents.length > 0 ? (
+                  <ul className="mt-4 space-y-2">
+                    {upcomingStudyEvents.map((event) => (
+                      <li key={event.id} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold text-slate-800">{event.title}</p>
+                          <p className="text-xs text-slate-500">{event.subject} · {event.date}{event.startTime ? ` · ${event.startTime}` : ''}</p>
+                        </div>
+                        <span className="shrink-0 text-xs font-semibold capitalize text-slate-600">{event.type.replace('_', ' ')}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">No upcoming study events. Add an exam, deadline, or study session when you need one.</p>
+                )}
+              </section>
+
+              {userGamification && (
+                <section aria-label="Study achievements">
+                  <GamificationDisplay gamification={userGamification} />
+                </section>
+              )}
+            </div>
+          </div>
         ) : currentTab === 'roadmap' ? (
           /* VIEW 2: Visual Study Roadmap Progression Tracks */
           <Suspense fallback={loadingFallback}>
@@ -1167,181 +1509,59 @@ export default function App() {
           /* VIEW 3: About Section & Creator Info */
           <Suspense fallback={loadingFallback}><AboutSection /></Suspense>
         ) : currentTab === 'tips' ? (
-          /* VIEW 4: Study Tips & Wisdom Hub */
+          /* VIEW 4: Community and personal study tips */
           <Suspense fallback={loadingFallback}>
-            <StudyTipsHub
-              tips={tips}
-              onAddTip={handleAddTip}
-              onLikeTip={handleLikeTip}
-            />
+            <div>
+              <CommunityTipsHub
+                key={session?.user?.id ?? 'signed-out'}
+                userId={session?.user?.id ?? null}
+                isLocalDemoUser={isLocalDemoUser}
+              />
+              <StudyTipsHub
+                tips={tips}
+                currentUserId={session?.user?.id || 'local_user'}
+                onAddTip={handleAddTip}
+                onUpdateTip={handleUpdateTip}
+                onLikeTip={handleLikeTip}
+                onDeleteTip={handleDeleteTip}
+              />
+            </div>
           </Suspense>
         ) : (
           /* VIEW 5: Reading Materials Directory & Media Hub */
           <div className="space-y-6">
+            <Suspense fallback={loadingFallback}>
+              <CommunityMaterialsHub
+                key={session?.user?.id ?? 'signed-out'}
+                userId={session?.user?.id ?? null}
+                isLocalDemoUser={isLocalDemoUser}
+                libraryMaterials={materials}
+              />
+            </Suspense>
             
-            {/* Header Hero Banner for Materials */}
-            <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
               <div>
-                {/* Student Greeting or Registration prompt */}
-                {studentProfile ? (
-                  <div className="flex items-center gap-2 mb-2 flex-wrap">
-                    <div className="px-2.5 py-1 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center gap-1.5 text-xs text-indigo-950 font-bold">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      <span>Welcome, {studentProfile.firstName}!</span>
-                      <span className="text-slate-300">•</span>
-                      <span className="text-indigo-700 font-medium">
-                        {studentProfile.educationLevel === 'university'
-                          ? `🎓 ${studentProfile.universityYear} (${studentProfile.majorFaculty || 'University'})`
-                          : `🎒 ${studentProfile.highSchoolGrade} (${studentProfile.academicStream || 'High School'})`}
-                      </span>
-                      <button
-                        onClick={() => setIsRegistrationModalOpen(true)}
-                        className="text-[11px] text-indigo-600 hover:text-indigo-900 underline font-bold ml-1 cursor-pointer"
-                      >
-                        Edit profile
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 mb-2">
-                    <button
-                      onClick={() => setIsRegistrationModalOpen(true)}
-                      className="px-3 py-1 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 flex items-center gap-2 text-xs text-amber-950 font-bold transition-all cursor-pointer shadow-2xs group"
-                    >
-                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                      <span>Register as a University or High School Student</span>
-                      <span className="text-amber-700 group-hover:translate-x-0.5 transition-transform font-black">→</span>
-                    </button>
-                  </div>
-                )}
-
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="bg-indigo-100 text-indigo-800 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md">
-                    Study library
-                  </span>
-                  <span className="text-xs text-slate-500 font-semibold">
-                    Your personal study space
-                  </span>
-                </div>
-                <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                  Student Reading Materials & Media Hub
-                </h2>
-                <p className="text-xs text-slate-500 max-w-2xl font-medium mt-0.5">
-                  Organize reading materials, photos, lecture videos, short clips, and documents in one place.
-                </p>
+                <p className="text-xs font-bold uppercase tracking-wider text-amber-800">Library</p>
+                <h1 className="mt-1 text-2xl font-black text-slate-900">Study materials</h1>
+                <p className="mt-1 text-sm text-slate-600">Find, organize, and update your learning materials.</p>
               </div>
-
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <button
-                  onClick={() => setCurrentTab('roadmap')}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold border border-indigo-200 transition-all cursor-pointer"
-                >
-                  <Route className="w-4 h-4 text-indigo-600" />
-                  <span>Study Roadmap</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setFlashcardTarget(null);
-                    setIsFlashcardModalOpen(true);
-                  }}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer"
-                >
-                  <Layers className="w-4 h-4 text-indigo-600" />
-                  <span>Flashcard Deck</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setEditingMaterial(null);
-                    setIsAddModalOpen(true);
-                  }}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add material</span>
-                </button>
-
-                <button
-                  onClick={() => setIsQuizModalOpen(true)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold border border-purple-200 transition-all cursor-pointer"
-                >
-                  <Timer className="w-4 h-4 text-purple-600" />
-                  <span>Practice Quiz</span>
-                </button>
-
-                <button
-                  onClick={() => setIsCalendarOpen(true)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200 transition-all cursor-pointer"
-                >
-                  <CalendarDays className="w-4 h-4 text-emerald-600" />
-                  <span>Study Calendar</span>
-                </button>
-              </div>
-
-            {/* Gamification Display - XP, Level, Badges */}
-            {userGamification && (
-              <GamificationDisplay gamification={userGamification} />
-            )}
-            </div>
-
-            {/* At-a-glance dashboard: primary counts are visible before the user scrolls. */}
-            <section className="fb-overview-grid" aria-label="Library overview">
-              <div className="fb-overview-card fb-overview-primary">
-                <span className="fb-overview-icon"><Library size={18} /></span>
-                <div><p className="fb-overview-label">Your library</p><strong>{materials.length}</strong><small>saved materials</small></div>
-              </div>
-              <div className="fb-overview-card">
-                <span className="fb-overview-icon"><BookOpen size={18} /></span>
-                <div><p className="fb-overview-label">In progress</p><strong>{materials.filter((m) => m.status === 'reading').length}</strong><small>currently studying</small></div>
-              </div>
-              <div className="fb-overview-card">
-                <span className="fb-overview-icon"><CheckCircle2 size={18} /></span>
-                <div><p className="fb-overview-label">Completed</p><strong>{materials.filter((m) => m.status === 'completed').length}</strong><small>finished materials</small></div>
-              </div>
-              <div className="fb-overview-card">
-                <span className="fb-overview-icon"><BellRing size={18} /></span>
-                <div><p className="fb-overview-label">Review due</p><strong>{inactivityAlerts.length}</strong><small>need attention</small></div>
-              </div>
+              <button type="button" onClick={() => { setEditingMaterial(null); setIsAddModalOpen(true); }} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-amber-300 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-200">
+                <Plus className="h-4 w-4" /> Add material
+              </button>
             </section>
 
-            {/* Daily Study Goal Tracker */}
-            <DailyStudyGoalTracker
-              goal={dailyGoal}
-              materials={materials}
-              onUpdateGoal={handleUpdateDailyGoal}
-              onOpenMaterial={(m) => setSelectedMaterialDetail(m)}
-            />
-
-            {/* Inactivity Alert Dashboard Banner (Reminds students of stale 'To Read' / 'Under Review' materials) */}
-            <DashboardAlertBanner
-              alerts={inactivityAlerts}
-              thresholdDays={alertThresholdDays}
-              onSetThresholdDays={handleSetThresholdDays}
-              onOpenMaterial={(m) => setSelectedMaterialDetail(m)}
-              onUpdateStatus={(id, newStatus) => {
-                const currentMat = materials.find((m) => m.id === id);
-                handleUpdateProgress(id, currentMat ? currentMat.pagesRead : 0, newStatus);
-              }}
-              onRefreshActivity={handleRefreshActivity}
-              onRefreshAllActivities={handleRefreshAllActivities}
-              onStartTimer={handleStartTimerForMaterial}
-              onFilterInactiveOnly={() => setFilterInactiveOnly(!filterInactiveOnly)}
-              isFilteredByInactive={filterInactiveOnly}
-            />
-
             {/* Filter & Search Bar */}
-            <div className="bg-white p-4 rounded-3xl border border-slate-200/90 shadow-xs space-y-3">
-              <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+            <div className="bg-white p-3 sm:p-4 rounded-3xl border border-slate-200/90 shadow-xs space-y-3">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center">
                 {/* Search Box */}
-                <div className="relative flex-1">
+                <div className="relative flex-1 w-full">
                   <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     id="material-search"
                     type="search"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search materials, subjects, authors, tags…"
+                    placeholder="Search materials…"
                     aria-label="Search reading materials"
                     className="w-full pl-9 pr-20 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 focus:bg-white transition-all font-medium"
                   />
@@ -1352,11 +1572,11 @@ export default function App() {
                 </div>
 
                 {/* Course/Subject Filter */}
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <select
                     value={selectedSubject}
                     onChange={(e) => setSelectedSubject(e.target.value)}
-                    className="px-3 py-2 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-700"
+                    className="fb-material-filter-select w-full sm:w-auto px-3 py-2 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-700"
                   >
                     <option value="all">📚 All Subjects</option>
                     {availableSubjects.map((sub) => (
@@ -1370,7 +1590,7 @@ export default function App() {
                   <select
                     value={selectedStatus}
                     onChange={(e) => setSelectedStatus(e.target.value)}
-                    className="px-3 py-2 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-700"
+                    className="fb-material-filter-select w-full sm:w-auto px-3 py-2 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-700"
                   >
                     <option value="all">⚡ All Statuses</option>
                     <option value="reading">📖 In Progress</option>
@@ -1383,7 +1603,7 @@ export default function App() {
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as any)}
-                    className="px-3 py-2 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-700"
+                    className="fb-material-filter-select w-full sm:w-auto px-3 py-2 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-700"
                   >
                     <option value="updated">🕒 Recent</option>
                     <option value="progress">📊 Progress</option>
@@ -1394,7 +1614,7 @@ export default function App() {
               </div>
 
               {/* Media Format & Inactivity Filter Pills */}
-              <div className="flex items-center gap-2 overflow-x-auto pt-3 border-t border-slate-100 text-xs fb-filter-strip">
+              <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-100 text-xs fb-filter-strip">
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
                   Filter:
                 </span>
@@ -1402,7 +1622,7 @@ export default function App() {
                 {/* Inactivity Alert Toggle Pill */}
                 <button
                   onClick={() => setFilterInactiveOnly(!filterInactiveOnly)}
-                  className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${
                     filterInactiveOnly
                       ? 'bg-amber-600 text-white shadow-xs'
                       : inactivityAlerts.length > 0
@@ -1419,7 +1639,7 @@ export default function App() {
 
                 <button
                   onClick={() => setSelectedMediaType('all')}
-                  className={`px-3 py-1 rounded-lg font-bold transition-all whitespace-nowrap ${
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all whitespace-nowrap ${
                     selectedMediaType === 'all'
                       ? 'bg-indigo-600 text-white'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -1429,7 +1649,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => setSelectedMediaType('has_docs')}
-                  className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1 whitespace-nowrap ${
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all flex items-center gap-1 whitespace-nowrap ${
                     selectedMediaType === 'has_docs'
                       ? 'bg-purple-600 text-white'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -1440,7 +1660,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => setSelectedMediaType('has_photos')}
-                  className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1 whitespace-nowrap ${
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all flex items-center gap-1 whitespace-nowrap ${
                     selectedMediaType === 'has_photos'
                       ? 'bg-indigo-600 text-white'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -1451,7 +1671,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => setSelectedMediaType('has_videos')}
-                  className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1 whitespace-nowrap ${
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all flex items-center gap-1 whitespace-nowrap ${
                     selectedMediaType === 'has_videos'
                       ? 'bg-blue-600 text-white'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -1462,7 +1682,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => setSelectedMediaType('has_short_videos')}
-                  className={`px-3 py-1 rounded-lg font-bold transition-all flex items-center gap-1 whitespace-nowrap ${
+                  className={`px-2.5 py-1 rounded-lg font-bold transition-all flex items-center gap-1 whitespace-nowrap ${
                     selectedMediaType === 'has_short_videos'
                       ? 'bg-emerald-600 text-white'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -1550,18 +1770,21 @@ export default function App() {
 
       {/* Persistent mobile navigation: core destinations stay reachable on every screen. */}
       {!selectedMaterialDetail && (
-        <nav className="fb-mobile-dock" aria-label="Main navigation">
-          <button type="button" onClick={() => setCurrentTab('materials')} className={currentTab === 'materials' ? 'is-active' : ''} aria-current={currentTab === 'materials' ? 'page' : undefined}>
-            <BookOpen size={19} /><span>Library</span>
+        <nav
+          className={`fb-mobile-dock transition-all duration-200 motion-reduce:transition-none ${isMobileDockVisible ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-full opacity-0'}`}
+          aria-label="Main navigation"
+        >
+          <button type="button" onClick={() => handleMobileTabClick('home')} className={currentTab === 'home' ? 'is-active' : ''} aria-current={currentTab === 'home' ? 'page' : undefined}>
+            <House size={19} /><span>Home</span>
           </button>
-          <button type="button" onClick={() => setCurrentTab('roadmap')} className={currentTab === 'roadmap' ? 'is-active' : ''} aria-current={currentTab === 'roadmap' ? 'page' : undefined}>
-            <Route size={19} /><span>Progress</span>
+          <button type="button" onClick={() => handleMobileTabClick('materials')} className={currentTab === 'materials' ? 'is-active' : ''} aria-current={currentTab === 'materials' ? 'page' : undefined}>
+            <BookOpen size={19} /><span>Library</span>
           </button>
           <button type="button" onClick={() => { setEditingMaterial(null); setIsAddModalOpen(true); }} className="fb-dock-add" aria-label="Add study material">
             <Plus size={21} /><span>Add</span>
           </button>
-          <button type="button" onClick={() => setCurrentTab('tips')} className={currentTab === 'tips' ? 'is-active' : ''} aria-current={currentTab === 'tips' ? 'page' : undefined}>
-            <Lightbulb size={19} /><span>Tips</span>
+          <button type="button" onClick={() => handleMobileTabClick('roadmap')} className={currentTab === 'roadmap' ? 'is-active' : ''} aria-current={currentTab === 'roadmap' ? 'page' : undefined}>
+            <Route size={19} /><span>Progress</span>
           </button>
           <button type="button" onClick={() => { setCurrentTab('flashcards'); setFlashcardTarget(null); setIsFlashcardModalOpen(true); }} className={currentTab === 'flashcards' ? 'is-active' : ''} aria-current={currentTab === 'flashcards' ? 'page' : undefined}>
             <Layers size={19} /><span>Cards</span>
@@ -1671,15 +1894,25 @@ export default function App() {
         </Suspense>
       )}
 
+      {isSettingsModalOpen && (
+        <Suspense fallback={loadingFallback}>
+          <SettingsModal
+            appearance={themePreference}
+            onChangeAppearance={handleThemePreferenceChange}
+            onClose={() => setIsSettingsModalOpen(false)}
+          />
+        </Suspense>
+      )}
+
       {/* Footer */}
       <footer className="w-full bg-white border-t border-slate-200 py-8 text-xs text-slate-500 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-4 border-b border-slate-100">
             <div className="text-center md:text-left">
-              <p className="font-extrabold text-slate-800 text-sm flex items-center justify-center md:justify-start gap-1.5">
-                <span>FacheeBook</span>
-                <span className="text-slate-300">•</span>
-                <span className="text-rose-600 font-bold flex items-center gap-1">
+              <p className="font-extrabold text-slate-800 text-sm flex flex-col items-center gap-1 md:flex-row md:justify-start md:gap-1.5">
+                <span className="whitespace-nowrap">FacheeBook</span>
+                <span className="hidden text-slate-300 md:inline">•</span>
+                <span className="fb-footer-credit text-rose-700 font-bold flex flex-wrap items-center justify-center gap-1 md:justify-start">
                   <Heart className="w-3.5 h-3.5 fill-rose-500 text-rose-500" />
                   Made with care by Waaree Jabboo Bakar
                 </span>
@@ -1695,7 +1928,7 @@ export default function App() {
                 href="https://www.youtube.com/@Waareetube"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs border border-red-200 transition-colors"
+                className="fb-footer-youtube flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs border border-red-200 transition-colors"
               >
                 <Youtube className="w-4 h-4 text-red-600" />
                 <span>Waaree Tube💥</span>

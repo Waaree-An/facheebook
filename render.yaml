@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: facheebook
+    runtime: node
+    plan: starter
+    region: oregon
+    branch: main
+    autoDeploy: true
+    rootDir: .
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: PUBLIC_SITE_URL
+        value: https://facheebook.onrender.com
+      - key: VITE_API_BASE_URL
+        value: https://facheebook.onrender.com
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash
+      - key: GEMINI_FALLBACK_MODELS
+        value: gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite,gemini-3.1-flash-lite
+      - key: AI_MAX_ATTEMPTS
+        value: "3"
+      - key: AI_ATTEMPT_TIMEOUT_MS
+        value: "20000"
+      - key: AI_TIMEOUT_MS
+        value: "120000"
+      - key: API_ALLOWED_ORIGINS
+        value: ""

@@ -75,7 +75,9 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
       {/* Bell Trigger Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`relative p-2 rounded-xl transition-all border cursor-pointer ${
+        aria-label="Review notifications"
+        aria-expanded={isOpen}
+        className={`relative p-2 rounded-xl transition-all border cursor-pointer max-[380px]:p-1.5 ${
           alertCount > 0
             ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100 shadow-2xs'
             : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
@@ -98,15 +100,15 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
 
       {/* Popover Dropdown Panel */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-3xl shadow-xl border border-slate-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className="fb-notification-popover absolute right-0 mt-2 w-[min(92vw,22rem)] sm:w-96 bg-white rounded-3xl shadow-xl border border-slate-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
           {/* Header */}
-          <div className="px-4 py-3 bg-slate-50/90 border-b border-slate-200 flex items-center justify-between">
+          <div className="px-3 py-2.5 sm:px-4 sm:py-3 bg-slate-50/90 border-b border-slate-200 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center font-bold text-xs">
                 <Bell className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="font-extrabold text-xs text-slate-900 flex items-center gap-1.5">
+                <h4 className="font-extrabold text-[11px] text-slate-900 flex items-center gap-1.5">
                   <span>Review Reminders</span>
                   {alertCount > 0 && (
                     <span className="bg-amber-100 text-amber-900 text-[10px] font-black px-1.5 py-0.2 rounded-full border border-amber-300">
@@ -185,7 +187,7 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
           )}
 
           {/* List of Alerts */}
-          <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+          <div className="max-h-[70vh] sm:max-h-80 overflow-y-auto divide-y divide-slate-100">
             {alertCount === 0 ? (
               <div className="p-6 text-center space-y-2">
                 <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
@@ -252,13 +254,13 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                     </div>
 
                     {/* Action Bar for this item */}
-                    <div className="flex items-center gap-1.5 pt-1">
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
                       <button
                         onClick={() => {
                           onOpenMaterial(material);
                           setIsOpen(false);
                         }}
-                        className="flex-1 py-1 px-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] text-center transition-colors"
+                        className="flex-1 min-w-[90px] py-1.5 px-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] text-center transition-colors"
                       >
                         Review Now
                       </button>
@@ -268,7 +270,7 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                           onStartTimer(material);
                           setIsOpen(false);
                         }}
-                        className="py-1 px-2 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-[10px] flex items-center gap-1 transition-colors"
+                        className="py-1.5 px-2 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold text-[10px] flex items-center justify-center gap-1 transition-colors"
                         title="Start 25m Focus Sprint"
                       >
                         <Play className="w-2.5 h-2.5 fill-amber-800 text-amber-800" />
@@ -279,7 +281,7 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                         onClick={() => {
                           onUpdateStatus(material.id, 'reading');
                         }}
-                        className="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] transition-colors"
+                        className="py-1.5 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] transition-colors"
                         title="Mark as in progress"
                       >
                         Mark Reading
@@ -287,7 +289,7 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
 
                       <button
                         onClick={() => onRefreshActivity(material.id)}
-                        className="p-1 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
                         title="Mark as refreshed (resets inactivity timer)"
                       >
                         <RefreshCw className="w-3.5 h-3.5" />
@@ -301,7 +303,7 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
 
           {/* Footer with Reset All Actions */}
           {alertCount > 0 && (
-            <div className="p-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
+            <div className="p-2.5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
               <button
                 onClick={onRefreshAllActivities}
                 className="text-[11px] font-bold text-slate-600 hover:text-indigo-600 flex items-center gap-1 transition-colors"

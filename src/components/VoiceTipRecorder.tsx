@@ -159,10 +159,10 @@ export const VoiceTipRecorder: React.FC<VoiceTipRecorderProps> = ({
       isRecording 
         ? 'bg-rose-50/70 border-rose-300 shadow-sm' 
         : 'bg-slate-50/90 border-slate-200/80'
-    } p-3.5 space-y-3 ${className}`}>
+    } p-3 space-y-3 ${className}`}>
       
       {/* Top Controls Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
             isRecording 
@@ -172,8 +172,8 @@ export const VoiceTipRecorder: React.FC<VoiceTipRecorderProps> = ({
             {isRecording ? <Mic className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-black text-slate-800 tracking-tight">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-[11px] sm:text-xs font-black text-slate-800 tracking-tight">
                 Voice-to-Text Recorder
               </span>
               {isRecording && (
@@ -183,7 +183,7 @@ export const VoiceTipRecorder: React.FC<VoiceTipRecorderProps> = ({
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-slate-500 font-medium">
+            <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium">
               {isRecording 
                 ? "Listening... Speak clearly into your microphone." 
                 : "Dictate your study tip instead of typing it out."}
@@ -192,12 +192,12 @@ export const VoiceTipRecorder: React.FC<VoiceTipRecorderProps> = ({
         </div>
 
         {/* Start / Stop Primary Button */}
-        <div className="flex items-center gap-2 self-end sm:self-auto">
+        <div className="flex items-center gap-2 self-stretch sm:self-auto">
           {isRecording ? (
             <button
               type="button"
               onClick={stopRecording}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold transition-all shadow-xs active:scale-95 cursor-pointer"
+              className="flex w-full items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[11px] sm:text-xs font-extrabold transition-all shadow-xs active:scale-95 cursor-pointer sm:w-auto"
             >
               <MicOff className="w-3.5 h-3.5" />
               <span>Stop Recording</span>
@@ -206,7 +206,7 @@ export const VoiceTipRecorder: React.FC<VoiceTipRecorderProps> = ({
             <button
               type="button"
               onClick={startRecording}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition-all shadow-xs active:scale-95 cursor-pointer"
+              className="flex w-full items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] sm:text-xs font-extrabold transition-all shadow-xs active:scale-95 cursor-pointer sm:w-auto"
             >
               <Mic className="w-3.5 h-3.5" />
               <span>Record with Microphone</span>
@@ -216,15 +216,15 @@ export const VoiceTipRecorder: React.FC<VoiceTipRecorderProps> = ({
       </div>
 
       {/* Target & Options Configuration Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/70 text-[11px]">
+      <div className="flex flex-col gap-2 pt-2 border-t border-slate-200/70 text-[11px] sm:flex-row sm:items-center sm:justify-between">
         {/* Dictation Target Selector */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
           <span className="text-slate-500 font-semibold">Dictate into:</span>
-          <div className="flex items-center rounded-lg bg-white border border-slate-200 p-0.5 shadow-2xs">
+          <div className="flex items-center rounded-lg bg-white border border-slate-200 p-0.5 shadow-2xs overflow-x-auto">
             <button
               type="button"
               onClick={() => setTargetField('content')}
-              className={`px-2 py-0.5 rounded-md font-bold transition-colors cursor-pointer ${
+              className={`px-2 py-0.5 rounded-md font-bold transition-colors cursor-pointer whitespace-nowrap ${
                 targetField === 'content'
                   ? 'bg-indigo-600 text-white shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
@@ -235,7 +235,7 @@ export const VoiceTipRecorder: React.FC<VoiceTipRecorderProps> = ({
             <button
               type="button"
               onClick={() => setTargetField('title')}
-              className={`px-2 py-0.5 rounded-md font-bold transition-colors cursor-pointer ${
+              className={`px-2 py-0.5 rounded-md font-bold transition-colors cursor-pointer whitespace-nowrap ${
                 targetField === 'title'
                   ? 'bg-indigo-600 text-white shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
@@ -247,13 +247,13 @@ export const VoiceTipRecorder: React.FC<VoiceTipRecorderProps> = ({
         </div>
 
         {/* Append vs Replace Mode */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center">
           <span className="text-slate-500 font-semibold">Input mode:</span>
-          <div className="flex items-center rounded-lg bg-white border border-slate-200 p-0.5 shadow-2xs">
+          <div className="flex items-center rounded-lg bg-white border border-slate-200 p-0.5 shadow-2xs overflow-x-auto">
             <button
               type="button"
               onClick={() => setWriteMode('append')}
-              className={`px-2 py-0.5 rounded-md font-bold transition-colors cursor-pointer ${
+              className={`px-2 py-0.5 rounded-md font-bold transition-colors cursor-pointer whitespace-nowrap ${
                 writeMode === 'append'
                   ? 'bg-slate-800 text-white'
                   : 'text-slate-600 hover:text-slate-900'
@@ -265,7 +265,7 @@ export const VoiceTipRecorder: React.FC<VoiceTipRecorderProps> = ({
             <button
               type="button"
               onClick={() => setWriteMode('replace')}
-              className={`px-2 py-0.5 rounded-md font-bold transition-colors cursor-pointer ${
+              className={`px-2 py-0.5 rounded-md font-bold transition-colors cursor-pointer whitespace-nowrap ${
                 writeMode === 'replace'
                   ? 'bg-slate-800 text-white'
                   : 'text-slate-600 hover:text-slate-900'

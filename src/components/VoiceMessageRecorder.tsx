@@ -8,7 +8,8 @@ import {
   blobToDataUrl, 
   formatAudioDuration, 
   generateWaveformPattern, 
-  formatAudioBytes 
+  formatAudioBytes,
+  pcmChunksToWav,
 } from '../utils/audioUtils';
 
 interface VoiceMessageRecorderProps {
@@ -33,13 +34,15 @@ export const VoiceMessageRecorder: React.FC<VoiceMessageRecorderProps> = ({
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Recording internals
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  const pcmChunksRef = useRef<Float32Array[]>([]);
   const durationTimerRef = useRef<number | null>(null);
+  const recordDurationRef = useRef(0);
   const animationFrameRef = useRef<number | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const sampleRateRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Clean up on unmount
@@ -77,7 +80,7 @@ export const VoiceMessageRecorder: React.FC<VoiceMessageRecorderProps> = ({
 
   const startRecording = async () => {
     setErrorMsg(null);
-    audioChunksRef.current = [];
+    pcmChunksRef.current = [];
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setErrorMsg("Audio recording is not supported in this browser. Please use Chrome, Edge, or Safari, or upload an audio file below.");
@@ -94,96 +97,63 @@ export const VoiceMessageRecorder: React.FC<VoiceMessageRecorderProps> = ({
       });
       streamRef.current = stream;
 
-      // Audio analysis for real-time visualizer
-      try {
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        if (AudioCtx) {
-          const audioCtx = new AudioCtx();
-          audioContextRef.current = audioCtx;
-          const source = audioCtx.createMediaStreamSource(stream);
-          const analyser = audioCtx.createAnalyser();
-          analyser.fftSize = 64;
-          source.connect(analyser);
-          analyserRef.current = analyser;
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) throw new Error('Audio recording is not supported in this browser. Please upload an audio file instead.');
 
-          const dataArray = new Uint8Array(analyser.frequencyBinCount);
-          const updateVolume = () => {
-            if (!analyserRef.current) return;
-            analyserRef.current.getByteFrequencyData(dataArray);
-            let sum = 0;
-            for (let i = 0; i < dataArray.length; i++) {
-              sum += dataArray[i];
-            }
-            const avg = sum / dataArray.length;
-            setVolumeLevel(Math.min(100, Math.round((avg / 128) * 100)));
-            animationFrameRef.current = requestAnimationFrame(updateVolume);
-          };
-          updateVolume();
-        }
-      } catch (e) {
-        console.warn('AudioContext visualization not available:', e);
-      }
+      const audioCtx = new AudioCtx();
+      audioContextRef.current = audioCtx;
+      await audioCtx.resume();
+      sampleRateRef.current = audioCtx.sampleRate;
 
-      // Determine best supported mimeType
-      let options: MediaRecorderOptions = {};
-      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-        options = { mimeType: 'audio/webm;codecs=opus' };
-      } else if (MediaRecorder.isTypeSupported('audio/webm')) {
-        options = { mimeType: 'audio/webm' };
-      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-        options = { mimeType: 'audio/mp4' };
-      } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
-        options = { mimeType: 'audio/ogg' };
-      }
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 64;
+      const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+      const silentGain = audioCtx.createGain();
+      silentGain.gain.value = 0;
 
-      const recorder = new MediaRecorder(stream, options);
-      mediaRecorderRef.current = recorder;
-
-      recorder.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
+      processor.onaudioprocess = (event) => {
+        pcmChunksRef.current.push(new Float32Array(event.inputBuffer.getChannelData(0)));
       };
+      source.connect(analyser);
+      analyser.connect(processor);
+      processor.connect(silentGain);
+      silentGain.connect(audioCtx.destination);
+      analyserRef.current = analyser;
+      processorRef.current = processor;
 
-      recorder.onstop = async () => {
-        const mimeType = recorder.mimeType || 'audio/webm';
-        const blob = new Blob(audioChunksRef.current, { type: mimeType });
-        if (blob.size === 0) return;
-
-        try {
-          const dataUrl = await blobToDataUrl(blob);
-          const finalDuration = recordDuration > 0 ? recordDuration : 1;
-          const newVoiceMessage: VoiceMessage = {
-            id: 'vm_' + Date.now(),
-            audioUrl: dataUrl,
-            durationSeconds: finalDuration,
-            recordedAt: new Date().toISOString(),
-            fileSizeFormatted: formatAudioBytes(blob.size),
-            waveform: generateWaveformPattern(28),
-          };
-          onVoiceMessageChange(newVoiceMessage);
-        } catch (err: any) {
-          setErrorMsg("Failed to process recorded audio. Please try again.");
-        }
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      const updateVolume = () => {
+        if (!analyserRef.current) return;
+        analyserRef.current.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+        const average = sum / dataArray.length;
+        setVolumeLevel(Math.min(100, Math.round((average / 128) * 100)));
+        animationFrameRef.current = requestAnimationFrame(updateVolume);
       };
+      updateVolume();
 
-      recorder.start(250); // Slice chunks every 250ms
       setIsRecording(true);
+      recordDurationRef.current = 0;
       setRecordDuration(0);
 
       // Start elapsed duration interval
       durationTimerRef.current = window.setInterval(() => {
-        setRecordDuration((prev) => {
-          if (prev + 1 >= maxDurationSeconds) {
-            stopInternalRecording(true);
-            return maxDurationSeconds;
-          }
-          return prev + 1;
-        });
+        const nextDuration = Math.min(recordDurationRef.current + 1, maxDurationSeconds);
+        recordDurationRef.current = nextDuration;
+        setRecordDuration(nextDuration);
+        if (nextDuration >= maxDurationSeconds) stopInternalRecording(true);
       }, 1000);
 
     } catch (err: any) {
       console.error('Microphone access error:', err);
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+      }
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
         setErrorMsg("Microphone permission was denied. Please allow microphone access in your browser settings to record voice notes.");
       } else {
@@ -202,20 +172,34 @@ export const VoiceMessageRecorder: React.FC<VoiceMessageRecorderProps> = ({
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
     }
+    if (processorRef.current) {
+      processorRef.current.onaudioprocess = null;
+      processorRef.current.disconnect();
+      processorRef.current = null;
+    }
+
+    const recordedChunks = pcmChunksRef.current;
+    pcmChunksRef.current = [];
+    if (save && recordedChunks.length > 0 && sampleRateRef.current > 0) {
+      const blob = pcmChunksToWav(recordedChunks, sampleRateRef.current);
+      void blobToDataUrl(blob).then((dataUrl) => {
+        const newVoiceMessage: VoiceMessage = {
+          id: 'vm_' + Date.now(),
+          audioUrl: dataUrl,
+          durationSeconds: Math.max(1, recordDurationRef.current),
+          recordedAt: new Date().toISOString(),
+          fileSizeFormatted: formatAudioBytes(blob.size),
+          waveform: generateWaveformPattern(28),
+        };
+        onVoiceMessageChange(newVoiceMessage);
+      }).catch(() => {
+        setErrorMsg('Failed to process recorded audio. Please try again.');
+      });
+    }
+
     if (audioContextRef.current) {
       audioContextRef.current.close().catch(() => {});
       audioContextRef.current = null;
-    }
-
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      if (!save) {
-        audioChunksRef.current = [];
-      }
-      try {
-        mediaRecorderRef.current.stop();
-      } catch {
-        // ignore
-      }
     }
 
     if (streamRef.current) {
@@ -229,6 +213,7 @@ export const VoiceMessageRecorder: React.FC<VoiceMessageRecorderProps> = ({
 
   const cancelRecording = () => {
     stopInternalRecording(false);
+    recordDurationRef.current = 0;
     setRecordDuration(0);
   };
 
@@ -294,7 +279,11 @@ export const VoiceMessageRecorder: React.FC<VoiceMessageRecorderProps> = ({
     if (isPreviewPlaying) {
       audio.pause();
     } else {
-      audio.play().catch(() => {});
+      setErrorMsg(null);
+      audio.play().catch(() => {
+        setIsPreviewPlaying(false);
+        setErrorMsg('This audio could not be played. Record it again or upload a supported audio file.');
+      });
     }
   };
 
@@ -319,27 +308,27 @@ export const VoiceMessageRecorder: React.FC<VoiceMessageRecorderProps> = ({
 
       {/* STATE 1: Currently Recording */}
       {isRecording && (
-        <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-400 shadow-sm space-y-3 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between">
+        <div className="p-4 rounded-2xl bg-[#321b22] border-2 border-rose-400/70 shadow-sm space-y-3 animate-in fade-in duration-200">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               <span className="relative flex h-3 w-3">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-600"></span>
               </span>
-              <span className="text-xs font-black text-rose-900 uppercase tracking-wider">
+              <span className="text-xs font-black text-rose-100 uppercase tracking-wider">
                 Recording Voice Note
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5 font-mono text-xs font-black text-rose-700 bg-rose-100/80 px-2.5 py-1 rounded-lg">
+            <div className="flex items-center gap-1.5 font-mono text-xs font-black text-rose-100 bg-rose-950/50 px-2.5 py-1 rounded-lg">
               <span>{formatAudioDuration(recordDuration)}</span>
-              <span className="text-rose-400">/</span>
-              <span className="text-rose-500">{formatAudioDuration(maxDurationSeconds)}</span>
+              <span className="text-rose-300">/</span>
+              <span className="text-rose-200">{formatAudioDuration(maxDurationSeconds)}</span>
             </div>
           </div>
 
           {/* Dynamic Frequency Volume Bars */}
-          <div className="bg-white/80 rounded-xl p-3 border border-rose-200 flex items-center justify-center gap-1.5 h-14">
+          <div className="bg-[#1c1115] rounded-xl p-3 border border-rose-400/30 flex items-center justify-center gap-1.5 h-14">
             {Array.from({ length: 24 }).map((_, i) => {
               // Simulated reactive bars based on live volumeLevel
               const distFromCenter = Math.abs(i - 11.5) / 11.5;
@@ -357,25 +346,25 @@ export const VoiceMessageRecorder: React.FC<VoiceMessageRecorderProps> = ({
             })}
           </div>
 
-          <p className="text-[11px] text-rose-700 text-center font-medium">
+          <p className="text-[11px] text-rose-100 text-center font-medium">
             Speak into your microphone. Explain the study concept, mnemonic, or study tip clearly.
           </p>
 
           {/* Controls: Finish Recording & Cancel */}
-          <div className="flex items-center justify-between pt-1">
+          <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between">
             <button
               type="button"
               onClick={cancelRecording}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
+              className="flex w-full items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-rose-300 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer sm:w-auto sm:border-transparent sm:py-1.5"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Discard</span>
+              <span>Discard recording</span>
             </button>
 
             <button
               type="button"
               onClick={finishRecording}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black shadow-md shadow-rose-600/30 active:scale-95 transition-all cursor-pointer"
+              className="flex w-full items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black shadow-md shadow-rose-600/30 active:scale-95 transition-all cursor-pointer sm:w-auto sm:py-2"
             >
               <Square className="w-3.5 h-3.5 fill-current" />
               <span>Finish & Attach Voice Note</span>
@@ -400,21 +389,21 @@ export const VoiceMessageRecorder: React.FC<VoiceMessageRecorderProps> = ({
               <div className="w-7 h-7 rounded-lg bg-emerald-500 text-white flex items-center justify-center shadow-xs">
                 <CheckCircle2 className="w-4 h-4" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <span className="text-xs font-bold text-slate-900 block">
                   Voice Message Attached
                 </span>
-                <span className="text-[10px] text-slate-500 font-medium">
-                  Duration: {formatAudioDuration(voiceMessage.durationSeconds)}
-                  {voiceMessage.fileSizeFormatted && ` • ${voiceMessage.fileSizeFormatted}`}
-                </span>
+                <div className="flex flex-wrap items-center gap-x-1.5 text-[10px] text-slate-500 font-medium">
+                  <span className="whitespace-nowrap">Duration: {formatAudioDuration(voiceMessage.durationSeconds)}</span>
+                  {voiceMessage.fileSizeFormatted && <span className="whitespace-nowrap">{voiceMessage.fileSizeFormatted}</span>}
+                </div>
               </div>
             </div>
 
             <button
               type="button"
               onClick={handleRemoveVoiceNote}
-              className="flex items-center gap-1 text-[11px] text-rose-600 hover:text-rose-800 font-bold px-2 py-1 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+              className="flex shrink-0 items-center justify-center gap-1 whitespace-nowrap text-[11px] text-rose-600 hover:text-rose-800 font-bold px-2 py-2 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
               title="Remove voice note"
             >
               <Trash2 className="w-3.5 h-3.5" />

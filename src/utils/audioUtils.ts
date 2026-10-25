@@ -39,6 +39,54 @@ export function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
+export function pcmChunksToWav(chunks: Float32Array[], sourceSampleRate: number, targetSampleRate = 16000): Blob {
+  const sourceLength = chunks.reduce((total, chunk) => total + chunk.length, 0);
+  const source = new Float32Array(sourceLength);
+  let sourceOffset = 0;
+  chunks.forEach((chunk) => {
+    source.set(chunk, sourceOffset);
+    sourceOffset += chunk.length;
+  });
+
+  const sampleRateRatio = sourceSampleRate / targetSampleRate;
+  const sampleCount = Math.floor(sourceLength / sampleRateRatio);
+  const dataLength = sampleCount * 2;
+  const buffer = new ArrayBuffer(44 + dataLength);
+  const view = new DataView(buffer);
+  const writeText = (offset: number, value: string) => {
+    for (let index = 0; index < value.length; index += 1) {
+      view.setUint8(offset + index, value.charCodeAt(index));
+    }
+  };
+
+  writeText(0, 'RIFF');
+  view.setUint32(4, 36 + dataLength, true);
+  writeText(8, 'WAVE');
+  writeText(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, targetSampleRate, true);
+  view.setUint32(28, targetSampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeText(36, 'data');
+  view.setUint32(40, dataLength, true);
+
+  for (let outputIndex = 0; outputIndex < sampleCount; outputIndex += 1) {
+    const start = Math.floor(outputIndex * sampleRateRatio);
+    const end = Math.min(sourceLength, Math.floor((outputIndex + 1) * sampleRateRatio));
+    let sum = 0;
+    for (let sourceIndex = start; sourceIndex < Math.max(start + 1, end); sourceIndex += 1) {
+      sum += source[sourceIndex] || 0;
+    }
+    const sample = Math.max(-1, Math.min(1, sum / Math.max(1, end - start)));
+    view.setInt16(44 + outputIndex * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+  }
+
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
 // Format file size bytes into KB/MB
 export function formatAudioBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

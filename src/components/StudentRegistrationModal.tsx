@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   GraduationCap, School, User, Mail, BookOpen, CheckCircle2, 
   X, Sparkles, Award, ShieldCheck, ArrowRight, RefreshCw, IdCard, 
-  Building2, Hash, Edit3, Check, Heart
+  Building2, Hash, Edit3, Check, Heart, Plus
 } from 'lucide-react';
 import { StudentProfile, EducationLevelType, UniversityYear, HighSchoolGrade } from '../types';
 import confetti from 'canvas-confetti';
@@ -185,32 +185,34 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-6 animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col">
+      <div className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-3 sm:my-6 animate-in fade-in zoom-in-95 duration-200 max-h-[94dvh] flex flex-col">
         
         {/* Header Ribbon */}
-        <div className="bg-gradient-to-r from-[#111619] via-[#1B242A] to-[#080A0B] text-white p-5 sm:p-6 flex items-center justify-between shrink-0 border-b border-indigo-900/50">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-indigo-600/30 border border-indigo-400/40 text-amber-300 flex items-center justify-center shadow-inner">
+        <div className="fb-student-modal-header bg-gradient-to-r from-[#111619] via-[#1B242A] to-[#080A0B] text-white p-4 sm:p-6 flex items-start justify-between gap-2 shrink-0 border-b border-indigo-900/50">
+          <div className="flex min-w-0 items-start gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-11 sm:h-11 shrink-0 rounded-2xl bg-indigo-600/30 border border-indigo-400/40 text-amber-300 flex items-center justify-center shadow-inner">
               <IdCard className="w-6 h-6 text-amber-400" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg sm:text-xl font-black tracking-tight text-white">
-                  Student Registration &amp; Academic Profile
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <h3 className="min-w-0 text-base sm:text-xl font-black leading-tight text-white">
+                  <span className="sm:hidden">Student profile</span>
+                  <span className="hidden sm:inline">Student Registration &amp; Academic Profile</span>
                 </h3>
-                <span className="bg-indigo-500/20 text-indigo-300 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border border-indigo-400/30">
+                <span className="hidden shrink-0 bg-indigo-500/20 text-indigo-300 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border border-indigo-400/30 sm:inline-flex">
                   FacheeBook
                 </span>
               </div>
-              <p className="text-xs text-slate-300 font-medium mt-0.5">
-                Register as a University or High School student to personalize your study path.
+              <p className="mt-1 text-[11px] leading-snug text-slate-300 font-medium sm:text-xs">
+                <span className="sm:hidden">Personalize your study path.</span>
+                <span className="hidden sm:inline">Register as a University or High School student to personalize your study path.</span>
               </p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
             aria-label="Close modal"
           >
             <X className="w-5 h-5" />
@@ -224,7 +226,7 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
           {currentProfile && !isEditing ? (
             <div className="space-y-6">
               {/* Digital Student ID Card */}
-              <div className="relative overflow-hidden bg-gradient-to-br from-[#111619] via-[#1B242A] to-[#080A0B] text-white rounded-3xl p-6 sm:p-8 shadow-lg border-2 border-indigo-500/30">
+              <div className="fb-student-card relative overflow-hidden bg-gradient-to-br from-[#111619] via-[#1B242A] to-[#080A0B] text-white rounded-3xl p-6 sm:p-8 shadow-lg border-2 border-indigo-500/30">
                 <div className="absolute -right-12 -top-12 w-48 h-48 bg-indigo-500/15 rounded-full blur-2xl pointer-events-none" />
                 <div className="absolute -left-12 -bottom-12 w-48 h-48 bg-amber-500/15 rounded-full blur-2xl pointer-events-none" />
 
@@ -313,23 +315,24 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
               </div>
 
               {/* Edit or Re-register Action */}
-              <div className="flex items-center justify-between pt-2">
-                <div className="text-xs text-slate-500 flex items-center gap-1.5">
+              <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="hidden text-xs text-slate-500 sm:flex sm:items-center sm:gap-1.5">
                   <ShieldCheck className="w-4 h-4 text-emerald-600" />
                   <span>FacheeBook student profile</span>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer"
+                    className="flex min-w-0 items-center justify-center gap-1.5 whitespace-nowrap px-2.5 py-2.5 sm:px-4 sm:py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[11px] sm:text-xs font-bold transition-all shadow-xs cursor-pointer"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
-                    <span>Edit Registration Details</span>
+                    <span className="sm:hidden">Edit profile</span>
+                    <span className="hidden sm:inline">Edit Registration Details</span>
                   </button>
                   <button
                     onClick={onClose}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                    className="min-w-0 whitespace-nowrap px-2.5 py-2.5 sm:px-4 sm:py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[11px] sm:text-xs font-bold transition-colors cursor-pointer"
                   >
                     Close
                   </button>
@@ -588,7 +591,10 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                               : 'bg-white text-slate-700 border-slate-200 hover:border-amber-300'
                           }`}
                         >
-                          <span className="truncate">{grd}</span>
+                          <span className="truncate">
+                            <span className="sm:hidden">{grd.split(' (')[0]}</span>
+                            <span className="hidden sm:inline">{grd}</span>
+                          </span>
                           {highSchoolGrade === grd && <Check className="w-3.5 h-3.5 shrink-0" />}
                         </button>
                       ))}
@@ -666,21 +672,24 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                   })}
                 </div>
 
-                <div className="flex gap-2 pt-1">
+                <div className="flex min-w-0 gap-2 pt-1">
                   <input
                     type="text"
                     placeholder="Add other subject (press Enter)..."
                     value={customSubjectInput}
                     onChange={(e) => setCustomSubjectInput(e.target.value)}
                     onKeyDown={handleAddCustomSubject}
-                    className="flex-1 px-3.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
+                    className="min-w-0 flex-1 px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
                   />
                   <button
                     type="button"
                     onClick={handleAddCustomSubject}
-                    className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                    aria-label="Add subject"
+                    title="Add subject"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center whitespace-nowrap bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold transition-colors cursor-pointer sm:h-auto sm:w-auto sm:px-3 sm:py-2"
                   >
-                    Add
+                    <Plus className="h-4 w-4 sm:hidden" />
+                    <span className="hidden sm:inline">Add</span>
                   </button>
                 </div>
               </div>
@@ -691,21 +700,21 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                   <span>Live Student ID Preview</span>
                   <span className="text-indigo-600 font-bold">FacheeBook Profile</span>
                 </div>
-                <div className="bg-white rounded-xl p-3 border border-slate-200 flex items-center justify-between gap-3 shadow-2xs">
-                  <div className="flex items-center gap-3">
+                <div className="bg-white rounded-xl p-3 border border-slate-200 flex flex-col items-start gap-2 shadow-2xs sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                  <div className="flex min-w-0 w-full items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white font-black text-sm flex items-center justify-center">
                       {(firstName[0] || 'S')}{(lastName[0] || 'T')}
                     </div>
-                    <div>
-                      <h5 className="font-extrabold text-sm text-slate-900 leading-tight">
+                    <div className="min-w-0">
+                      <h5 className="break-words font-extrabold text-sm text-slate-900 leading-tight">
                         {firstName.trim() || 'Student'} {lastName.trim() || 'Name'}
                       </h5>
-                      <p className="text-[11px] text-slate-500 font-medium">
+                      <p className="break-words text-[11px] text-slate-500 font-medium">
                         {activeLevelLabel} • {institutionDisplayName}
                       </p>
                     </div>
                   </div>
-                  <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-2 py-1 rounded-md">
+                  <span className="max-w-full break-words text-[10px] font-mono text-slate-400 bg-slate-100 px-2 py-1 rounded-md sm:self-start">
                     {focusDisplayName}
                   </span>
                 </div>
@@ -719,7 +728,8 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                     onClick={() => setIsEditing(false)}
                     className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
                   >
-                    Cancel Editing
+                    <span className="sm:hidden">Cancel</span>
+                    <span className="hidden sm:inline">Cancel Editing</span>
                   </button>
                 ) : (
                   <button
@@ -737,7 +747,8 @@ export const StudentRegistrationModal: React.FC<StudentRegistrationModalProps> =
                   className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-wait text-white rounded-xl text-xs font-extrabold shadow-sm shadow-indigo-600/20 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>{saving ? 'Saving to cloud…' : currentProfile ? 'Save Changes' : 'Complete Registration'}</span>
+                  <span className="sm:hidden">{saving ? 'Saving…' : currentProfile ? 'Save' : 'Register'}</span>
+                  <span className="hidden sm:inline">{saving ? 'Saving to cloud…' : currentProfile ? 'Save Changes' : 'Complete Registration'}</span>
                 </button>
               </div>
             </form>

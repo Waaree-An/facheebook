@@ -28,7 +28,7 @@ export const AboutSection: React.FC = () => {
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
       {/* Hero Creator Header */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-[#111619] via-[#1B242A] to-[#080A0B] text-white rounded-3xl p-6 sm:p-10 shadow-lg border border-indigo-900/50">
+      <div className="fb-themed-hero relative overflow-hidden bg-gradient-to-br from-[#111619] via-[#1B242A] to-[#080A0B] text-white rounded-3xl p-6 sm:p-10 shadow-lg border border-indigo-900/50">
         <div className="absolute -right-16 -top-16 w-64 h-64 bg-rose-500/15 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -left-16 -bottom-16 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
 
@@ -48,7 +48,7 @@ export const AboutSection: React.FC = () => {
           </h2>
 
           {/* User's Exact Requested Text Callout */}
-          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 sm:p-5 mt-4">
+          <div className="fb-themed-hero-callout bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 sm:p-5 mt-4">
             <p className="text-sm sm:text-base font-bold text-rose-100 leading-relaxed flex items-start gap-2.5">
               <span className="text-xl shrink-0">💖</span>
               <span>

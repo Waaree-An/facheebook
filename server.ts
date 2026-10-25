@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import { readFile } from "node:fs/promises";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
@@ -160,9 +161,50 @@ async function generateWithRetry(
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
+const PUBLIC_SITE_URL = (() => {
+  const configuredUrl = process.env.PUBLIC_SITE_URL?.trim();
+  if (!configuredUrl) return null;
+  const parsedUrl = new URL(configuredUrl);
+  if (
+    !["http:", "https:"].includes(parsedUrl.protocol) ||
+    parsedUrl.username ||
+    parsedUrl.password ||
+    parsedUrl.search ||
+    parsedUrl.hash ||
+    (process.env.NODE_ENV === "production" && parsedUrl.protocol !== "https:") ||
+    (parsedUrl.pathname !== "/" && parsedUrl.pathname !== "")
+  ) {
+    throw new Error("PUBLIC_SITE_URL must be a public HTTPS origin in production, without a path, credentials, query, or fragment.");
+  }
+  return parsedUrl.origin;
+})();
+const API_ALLOWED_ORIGINS = new Set([
+  "https://localhost",
+  "http://localhost",
+  ...((process.env.API_ALLOWED_ORIGINS || "").split(",").map((origin) => origin.trim()).filter(Boolean)),
+  ...(PUBLIC_SITE_URL ? [PUBLIC_SITE_URL] : []),
+]);
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use("/api", (req, res, next) => {
+  const origin = req.get("Origin");
+  if (!origin) return next();
+
+  const requestOrigin = `${req.protocol}://${req.get("host")}`;
+  if (origin === requestOrigin) return next();
+  if (!API_ALLOWED_ORIGINS.has(origin)) {
+    return res.status(403).json({ error: "This origin is not allowed to access the API." });
+  }
+
+  res.set("Access-Control-Allow-Origin", origin);
+  res.set("Vary", "Origin");
+  res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.set("Access-Control-Max-Age", "86400");
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
+});
 
 // Lazy-initialized Google GenAI client
 let genAiClient: GoogleGenAI | null = null;
@@ -463,6 +505,38 @@ async function startServer() {
   // `res.json()` calls fail with a clear error instead of a parse exception.
   app.use("/api", (req, res) => {
     res.status(404).json({ error: `Unknown API endpoint: ${req.method} /api${req.path}` });
+  });
+
+  app.get("/", async (_req, res, next) => {
+    try {
+      const landingPath = path.join(process.cwd(), isProduction ? "dist" : "public", "landing.html");
+      const template = await readFile(landingPath, "utf8");
+      let landingPage = template
+        .replaceAll("__PUBLIC_SITE_URL__", PUBLIC_SITE_URL ?? "")
+        .replace("__PUBLIC_SITE_URL_JSON__", PUBLIC_SITE_URL ? JSON.stringify(PUBLIC_SITE_URL) : "null");
+      if (!PUBLIC_SITE_URL) {
+        landingPage = landingPage
+          .replace(/\s*<meta property="og:url"[^>]*>\s*/, "\n")
+          .replace(/\s*<link rel="canonical"[^>]*>\s*/, "\n");
+      }
+      res.type("html").send(landingPage);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/robots.txt", (_req, res) => {
+    const sitemapLine = PUBLIC_SITE_URL ? `Sitemap: ${PUBLIC_SITE_URL}/sitemap.xml\n` : "";
+    res.type("text/plain").send(`User-agent: *\nAllow: /\nDisallow: /api/\n${sitemapLine}`);
+  });
+
+  app.get("/sitemap.xml", (_req, res) => {
+    if (!PUBLIC_SITE_URL) {
+      return res.status(503).type("text/plain").send("Set PUBLIC_SITE_URL to the public HTTPS site origin to generate the sitemap.");
+    }
+    res.type("application/xml").send(
+      `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${PUBLIC_SITE_URL}/</loc></url></urlset>`,
+    );
   });
 
   if (!isProduction) {

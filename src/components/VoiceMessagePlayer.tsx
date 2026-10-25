@@ -26,6 +26,7 @@ export const VoiceMessagePlayer: React.FC<VoiceMessagePlayerProps> = ({
   const [isMuted, setIsMuted] = useState(false);
   const [playbackRate, setPlaybackRate] = useState<number>(1);
   const [hoveredBarIndex, setHoveredBarIndex] = useState<number | null>(null);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
 
   // Waveform data or fallback pattern
   const waveform = voiceMessage.waveform && voiceMessage.waveform.length > 0
@@ -37,6 +38,7 @@ export const VoiceMessagePlayer: React.FC<VoiceMessagePlayerProps> = ({
     if (!audio) return;
 
     const handleLoadedMetadata = () => {
+      setPlaybackError(null);
       if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
         setDuration(Math.round(audio.duration));
       }
@@ -55,6 +57,11 @@ export const VoiceMessagePlayer: React.FC<VoiceMessagePlayerProps> = ({
       setIsPlaying(false);
     };
 
+    const handleError = () => {
+      setIsPlaying(false);
+      setPlaybackError('This recording cannot be played. Record it again to replace it.');
+    };
+
     const handlePlay = () => {
       setIsPlaying(true);
     };
@@ -64,6 +71,7 @@ export const VoiceMessagePlayer: React.FC<VoiceMessagePlayerProps> = ({
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('pause', handlePause);
     audio.addEventListener('play', handlePlay);
+    audio.addEventListener('error', handleError);
 
     return () => {
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
@@ -71,6 +79,7 @@ export const VoiceMessagePlayer: React.FC<VoiceMessagePlayerProps> = ({
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('pause', handlePause);
       audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('error', handleError);
     };
   }, [voiceMessage.audioUrl]);
 
@@ -81,8 +90,11 @@ export const VoiceMessagePlayer: React.FC<VoiceMessagePlayerProps> = ({
     if (isPlaying) {
       audio.pause();
     } else {
+      setPlaybackError(null);
       audio.play().catch((err) => {
         console.warn('Audio playback error:', err);
+        setIsPlaying(false);
+        setPlaybackError('This recording cannot be played. Record it again to replace it.');
       });
     }
   };
@@ -120,7 +132,7 @@ export const VoiceMessagePlayer: React.FC<VoiceMessagePlayerProps> = ({
 
   return (
     <div 
-      className={`rounded-2xl transition-all select-none ${
+      className={`box-border min-w-0 w-full rounded-2xl transition-all select-none ${
         isFeatured 
           ? 'bg-amber-100/70 border border-amber-300/80 p-3.5 shadow-xs' 
           : 'bg-indigo-50/70 border border-indigo-200/80 p-3 shadow-2xs'
@@ -133,8 +145,8 @@ export const VoiceMessagePlayer: React.FC<VoiceMessagePlayerProps> = ({
       />
 
       {/* Header Info: Voice Note label & duration */}
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <div className="flex items-center gap-1.5">
+      <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           <span className={`flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${
             isFeatured 
               ? 'bg-amber-200 text-amber-900' 
@@ -144,14 +156,14 @@ export const VoiceMessagePlayer: React.FC<VoiceMessagePlayerProps> = ({
             <span>Voice Note</span>
           </span>
           {authorName && (
-            <span className="text-[11px] text-slate-500 font-medium truncate">
+            <span className="min-w-0 max-w-full text-[11px] text-slate-500 font-medium break-words">
               from {authorName}
             </span>
           )}
         </div>
 
         {/* Speed and Download Action Controls */}
-        <div className="flex items-center gap-1">
+        <div className="ml-auto flex shrink-0 items-center gap-1">
           <button
             type="button"
             onClick={cyclePlaybackRate}
@@ -188,12 +200,13 @@ export const VoiceMessagePlayer: React.FC<VoiceMessagePlayerProps> = ({
       </div>
 
       {/* Main Player Row: Play/Pause Button + Interactive Waveform */}
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3 relative z-10">
         {/* Play / Pause Circular Button */}
         <button
           type="button"
           onClick={togglePlay}
-          className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all shadow-xs shrink-0 cursor-pointer active:scale-95 ${
+          aria-label={isPlaying ? 'Pause voice message' : 'Play voice message'}
+          className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all shadow-xs shrink-0 cursor-pointer active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 ${
             isPlaying
               ? isFeatured 
                 ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-300' 
@@ -201,8 +214,7 @@ export const VoiceMessagePlayer: React.FC<VoiceMessagePlayerProps> = ({
               : isFeatured
                 ? 'bg-slate-900 text-amber-400 hover:bg-slate-800'
                 : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-          }`}
-          title={isPlaying ? 'Pause voice message' : 'Play voice message'}
+          } pointer-events-auto`}
         >
           {isPlaying ? (
             <Pause className="w-4 h-4 fill-current" />
@@ -212,7 +224,7 @@ export const VoiceMessagePlayer: React.FC<VoiceMessagePlayerProps> = ({
         </button>
 
         {/* Interactive Waveform Display */}
-        <div className="flex-1 flex flex-col justify-center">
+        <div className="min-w-0 flex-1 flex flex-col justify-center">
           <div 
             className="flex items-end gap-[2px] sm:gap-1 h-7 cursor-pointer py-1 group"
             onClick={(e) => {
@@ -256,6 +268,11 @@ export const VoiceMessagePlayer: React.FC<VoiceMessagePlayerProps> = ({
           </div>
         </div>
       </div>
+      {playbackError && (
+        <p role="status" className="mt-2 text-[10px] font-semibold text-rose-300">
+          {playbackError}
+        </p>
+      )}
     </div>
   );
 };

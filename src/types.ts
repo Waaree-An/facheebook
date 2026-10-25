@@ -36,6 +36,7 @@ export interface ReadingMaterial {
   pagesRead: number;
   tags: string[];
   keyTakeaways: string[];
+  keyDefinitions?: KeyDefinition[];
   notesMarkdown?: string;
   
   // Media items
@@ -46,6 +47,11 @@ export interface ReadingMaterial {
 
   createdAt: string;
   updatedAt: string;
+}
+
+export interface KeyDefinition {
+  term: string;
+  definition: string;
 }
 
 export interface VoiceMessage {
@@ -59,6 +65,9 @@ export interface VoiceMessage {
 
 export interface StudyTip {
   id: string;
+  ownerId?: string;
+  communityStatus?: 'pending' | 'approved' | 'rejected';
+  moderationNote?: string | null;
   title: string;
   authorName: string;
   category: 'active_recall' | 'time_management' | 'note_taking' | 'exam_prep' | 'wellness' | 'resource_sharing';

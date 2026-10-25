@@ -15,29 +15,29 @@ export const GamificationDisplay: React.FC<GamificationDisplayProps> = ({
   const progress = xpProgressPercent(gamification);
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-5 mb-6">
+    <div className="bg-[#111619] rounded-3xl border border-amber-300/20 shadow-xl shadow-black/10 p-5 mb-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 shadow-sm">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-400/10 text-amber-300 shadow-sm">
             <Trophy className="h-6 w-6" />
           </div>
           <div>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Study Level</p>
-            <p className="text-xl font-black text-slate-900">Level {gamification.level}</p>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Study Level</p>
+            <p className="text-xl font-black text-white">Level {gamification.level}</p>
           </div>
         </div>
         <div className="text-right hidden sm:block">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">XP</p>
-          <p className="text-lg font-black text-slate-900">{gamification.xp} ⭐</p>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">XP</p>
+          <p className="text-lg font-black text-white">{gamification.xp} ⭐</p>
         </div>
       </div>
 
       <div className="mb-4">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-bold text-slate-600">Progress to Level {gamification.level + 1}</span>
-          <span className="text-xs font-bold text-amber-700">{progress}%</span>
+          <span className="text-xs font-bold text-slate-300">Progress to Level {gamification.level + 1}</span>
+          <span className="text-xs font-bold text-amber-300">{progress}%</span>
         </div>
-        <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden border border-slate-100">
+        <div className="h-3 w-full bg-slate-800 rounded-full overflow-hidden border border-slate-700">
           <div
             className="h-full bg-gradient-to-r from-amber-500 via-amber-400 to-amber-300 rounded-full transition-all duration-700 ease-out shadow-[0_0_15px_rgba(244,199,91,0.4)]"
             style={{ width: `${progress}%` }}
@@ -46,38 +46,38 @@ export const GamificationDisplay: React.FC<GamificationDisplayProps> = ({
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-amber-50 border border-amber-100">
-          <Flame className="h-4 w-4 text-amber-600" />
+        <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-amber-400/10 border border-amber-300/20">
+          <Flame className="h-4 w-4 text-amber-300" />
           <div>
-            <p className="text-[10px] font-bold text-amber-700 uppercase">Study Streak</p>
-            <p className="text-sm font-black text-slate-900">{gamification.currentStreakDays} days</p>
+            <p className="text-[10px] font-bold text-amber-300 uppercase">Study Streak</p>
+            <p className="text-sm font-black text-white">{gamification.currentStreakDays} days</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-indigo-50 border border-indigo-100">
-          <Zap className="h-4 w-4 text-indigo-600" />
+        <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-indigo-400/10 border border-indigo-300/20">
+          <Zap className="h-4 w-4 text-indigo-300" />
           <div>
-            <p className="text-[10px] font-bold text-indigo-700 uppercase">Materials Done</p>
-            <p className="text-sm font-black text-slate-900">{gamification.totalMaterialsCompleted}</p>
+            <p className="text-[10px] font-bold text-indigo-300 uppercase">Materials Done</p>
+            <p className="text-sm font-black text-white">{gamification.totalMaterialsCompleted}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-rose-50 border border-rose-100">
-          <Zap className="h-4 w-4 text-rose-600" />
+        <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-rose-400/10 border border-rose-300/20">
+          <Zap className="h-4 w-4 text-rose-300" />
           <div>
-            <p className="text-[10px] font-bold text-rose-700 uppercase">Flashcards</p>
-            <p className="text-sm font-black text-slate-900">{gamification.totalFlashcardsReviewed}</p>
+            <p className="text-[10px] font-bold text-rose-300 uppercase">Flashcards</p>
+            <p className="text-sm font-black text-white">{gamification.totalFlashcardsReviewed}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-purple-50 border border-purple-100">
-          <Star className="h-4 w-4 text-purple-600" />
+        <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-purple-400/10 border border-purple-300/20">
+          <Star className="h-4 w-4 text-purple-300" />
           <div>
-            <p className="text-[10px] font-bold text-purple-700 uppercase">Quizzes</p>
-            <p className="text-sm font-black text-slate-900">{gamification.totalQuizzesTaken}</p>
+            <p className="text-[10px] font-bold text-purple-300 uppercase">Quizzes</p>
+            <p className="text-sm font-black text-white">{gamification.totalQuizzesTaken}</p>
           </div>
         </div>
       </div>
 
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Badges & Achievements</h3>
+        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Badges & Achievements</h3>
       </div>
       <div className="flex gap-2 overflow-x-auto pb-2">
         {gamification.badges.length > 0 ? (

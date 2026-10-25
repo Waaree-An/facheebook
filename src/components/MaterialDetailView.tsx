@@ -27,6 +27,7 @@ export const MaterialDetailView: React.FC<MaterialDetailViewProps> = ({
   onUpdateMaterial,
 }) => {
   const [activeTab, setActiveTab] = useState<'docs' | 'photos' | 'videos' | 'short_videos' | 'notes' | 'quiz'>('docs');
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<FileAttachment | null>(null);
   const [selectedDocPreview, setSelectedDocPreview] = useState<FileAttachment | null>(
     material.documents.length > 0 ? material.documents[0] : null
@@ -214,9 +215,21 @@ export const MaterialDetailView: React.FC<MaterialDetailViewProps> = ({
             </p>
 
             {material.description && (
-              <p className="text-xs sm:text-sm text-slate-700 leading-relaxed max-w-3xl mb-4">
-                {material.description}
-              </p>
+              <div className="mb-4 max-w-3xl">
+                <p className={`text-xs sm:text-sm text-slate-700 leading-relaxed ${isDescriptionExpanded ? '' : 'max-sm:line-clamp-4'}`}>
+                  {material.description}
+                </p>
+                {material.description.length > 280 && (
+                  <button
+                    type="button"
+                    onClick={() => setIsDescriptionExpanded((expanded) => !expanded)}
+                    aria-expanded={isDescriptionExpanded}
+                    className="mt-1 text-xs font-bold text-amber-500 hover:text-amber-400 sm:hidden"
+                  >
+                    {isDescriptionExpanded ? 'Show less' : 'Show more'}
+                  </button>
+                )}
+              </div>
             )}
 
             {/* Tags */}
@@ -936,6 +949,25 @@ export const MaterialDetailView: React.FC<MaterialDetailViewProps> = ({
       {/* Tab 5: Notes & Key Takeaways */}
       {activeTab === 'notes' && (
         <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-6">
+          {material.keyDefinitions?.length ? (
+            <section aria-labelledby="material-definitions-title">
+              <div className="mb-3 flex items-center gap-2">
+                <BookOpen className="h-4 w-4 text-amber-500" />
+                <h3 id="material-definitions-title" className="font-black text-base text-slate-900">
+                  Key Definitions
+                </h3>
+              </div>
+              <dl className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {material.keyDefinitions.map(({ term, definition }, index) => (
+                  <div key={`${term}-${index}`} className="rounded-xl border border-amber-200/70 bg-amber-50/40 p-3">
+                    <dt className="text-xs font-extrabold text-slate-900">{term}</dt>
+                    <dd className="mt-1 text-xs leading-relaxed text-slate-600">{definition}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          ) : null}
+
           {/* Key Takeaways Interactive Checklist */}
           <div>
             <div className="flex items-center justify-between mb-3">
