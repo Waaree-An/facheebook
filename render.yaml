@@ -7,18 +7,16 @@ services:
     branch: main
     autoDeploy: true
     rootDir: .
-    buildCommand: npm install && npm run build
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 10000
       - key: PUBLIC_SITE_URL
         value: https://facheebook.onrender.com
       - key: VITE_API_BASE_URL
-        value: https://facheebook.onrender.com
+        value: ""
       - key: VITE_SUPABASE_URL
         sync: false
       - key: VITE_SUPABASE_PUBLISHABLE_KEY
