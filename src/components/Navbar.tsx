@@ -15,6 +15,7 @@ import {
   Settings,
   ChevronDown,
   UserRound,
+  UsersRound,
 } from 'lucide-react';
 
 import {
@@ -30,9 +31,9 @@ interface NavbarProps {
   isNavigationHidden: boolean;
   onRevealNavigation: () => void;
   materials: ReadingMaterial[];
-  currentTab: 'home' | 'materials' | 'roadmap' | 'tips' | 'flashcards' | 'about';
+  currentTab: 'home' | 'materials' | 'roadmap' | 'tips' | 'community' | 'flashcards' | 'about';
   onSelectTab: (
-    tab: 'home' | 'materials' | 'roadmap' | 'tips' | 'flashcards' | 'about'
+    tab: 'home' | 'materials' | 'roadmap' | 'tips' | 'community' | 'flashcards' | 'about'
   ) => void;
   onOpenAddModal: () => void;
   onOpenTimerModal: () => void;
@@ -133,6 +134,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'materials' as const, label: 'Library', icon: BookOpen },
     { id: 'roadmap' as const, label: 'Progress', icon: Route },
     { id: 'tips' as const, label: 'Tips', icon: Lightbulb },
+    { id: 'community' as const, label: 'Community', icon: UsersRound },
     { id: 'flashcards' as const, label: 'Cards', icon: Layers },
     { id: 'about' as const, label: 'About', icon: Heart },
   ];

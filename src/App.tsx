@@ -26,7 +26,8 @@ import {
   Search, Filter, Plus, BookOpen, Layers, Lightbulb, X, Target, Library,
   Sparkles, CheckCircle2, Image, Video, FileText, Link2, 
   Flame, Clock, ArrowUpDown, BellRing, Bell, AlertTriangle, House,
-  Heart, Youtube, Facebook, ExternalLink, Route, Trophy, Zap, ZapIcon, Timer, CalendarDays, Award
+  Heart, Youtube, Facebook, ExternalLink, Route, Trophy, Zap, ZapIcon, Timer, CalendarDays, Award,
+  UsersRound,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { GamificationDisplay } from './components/GamificationDisplay';
@@ -139,7 +140,7 @@ export default function App() {
     try { return localStorage.getItem('fachee_legacy_imported') === '1'; } catch { return false; }
   });
   const dataScope = isLocalDemoUser || !session?.user?.id ? 'local' : `account_${session.user.id}`;
-  const [currentTab, setCurrentTab] = useState<'home' | 'materials' | 'roadmap' | 'tips' | 'flashcards' | 'about'>('home');
+  const [currentTab, setCurrentTab] = useState<'home' | 'materials' | 'roadmap' | 'tips' | 'community' | 'flashcards' | 'about'>('home');
   const [selectedMaterialDetail, setSelectedMaterialDetail] = useState<ReadingMaterial | null>(null);
   const [areNavigationBarsHidden, setAreNavigationBarsHidden] = useState(false);
   const [isMobileDockVisible, setIsMobileDockVisible] = useState(false);
@@ -1113,9 +1114,15 @@ export default function App() {
     handleSetThresholdDays(1);
   };
 
-  const handleMobileTabClick = (tab: 'home' | 'materials' | 'roadmap') => {
+  const handleMobileTabClick = (tab: 'home' | 'materials' | 'roadmap' | 'community' | 'flashcards') => {
     if (currentTab === tab) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (tab === 'flashcards') {
+      setCurrentTab(tab);
+      setFlashcardTarget(null);
+      setIsFlashcardModalOpen(true);
       return;
     }
     setCurrentTab(tab);
@@ -1346,6 +1353,27 @@ export default function App() {
               </div>
             </section>
 
+            {materials.length === 0 && (
+              <section className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-5 shadow-sm sm:p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Quick start</p>
+                    <h2 className="mt-2 text-xl font-black text-slate-900">Add your first study material</h2>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">
+                      Keep it simple: add one topic, one subject, and start learning with a timer or a quick review.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setEditingMaterial(null); setIsAddModalOpen(true); }}
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-600 focus-visible:ring-offset-2"
+                  >
+                    <Plus size={17} /> Add material
+                  </button>
+                </div>
+              </section>
+            )}
+
             {session?.user && (
               <div className={`fb-sync-status rounded-2xl border p-4 text-sm ${cloudSyncError ? 'is-error border-red-200 bg-red-50 text-red-900' : isLocalDemoUser ? 'is-local border-amber-200 bg-amber-50 text-amber-950' : 'is-ready border-emerald-200 bg-emerald-50 text-emerald-900'}`}>
                 <p className="flex items-center gap-2 font-bold">
@@ -1509,14 +1537,14 @@ export default function App() {
           /* VIEW 3: About Section & Creator Info */
           <Suspense fallback={loadingFallback}><AboutSection /></Suspense>
         ) : currentTab === 'tips' ? (
-          /* VIEW 4: Community and personal study tips */
+          /* Personal study tips */
           <Suspense fallback={loadingFallback}>
-            <div>
-              <CommunityTipsHub
-                key={session?.user?.id ?? 'signed-out'}
-                userId={session?.user?.id ?? null}
-                isLocalDemoUser={isLocalDemoUser}
-              />
+            <div className="space-y-5">
+              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="text-xs font-bold uppercase tracking-wider text-amber-800">Your study space</p>
+                <h1 className="mt-1 text-2xl font-black text-slate-900">My study tips</h1>
+                <p className="mt-1 text-sm text-slate-600">Save and organize tips for your own study routine. Visit Community to browse and share with other students.</p>
+              </section>
               <StudyTipsHub
                 tips={tips}
                 currentUserId={session?.user?.id || 'local_user'}
@@ -1527,18 +1555,33 @@ export default function App() {
               />
             </div>
           </Suspense>
-        ) : (
-          /* VIEW 5: Reading Materials Directory & Media Hub */
-          <div className="space-y-6">
-            <Suspense fallback={loadingFallback}>
+        ) : currentTab === 'community' ? (
+          /* Shared student resources and tips */
+          <Suspense fallback={loadingFallback}>
+            <div className="space-y-6">
+              <section className="rounded-3xl border border-amber-200 bg-gradient-to-br from-slate-900 to-slate-800 p-5 text-white shadow-sm sm:p-6">
+                <p className="text-xs font-bold uppercase tracking-wider text-amber-300">Learn together</p>
+                <h1 className="mt-1 text-2xl font-black">Student Community</h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+                  Discover shared study materials and practical tips from other students. Your personal Library and Tips stay separate.
+                </p>
+              </section>
               <CommunityMaterialsHub
-                key={session?.user?.id ?? 'signed-out'}
+                key={`materials-${session?.user?.id ?? 'signed-out'}`}
                 userId={session?.user?.id ?? null}
                 isLocalDemoUser={isLocalDemoUser}
                 libraryMaterials={materials}
               />
-            </Suspense>
-            
+              <CommunityTipsHub
+                key={`tips-${session?.user?.id ?? 'signed-out'}`}
+                userId={session?.user?.id ?? null}
+                isLocalDemoUser={isLocalDemoUser}
+              />
+            </div>
+          </Suspense>
+        ) : (
+          /* Personal reading materials directory */
+          <div className="space-y-6">
             <section className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-amber-800">Library</p>
@@ -1786,7 +1829,10 @@ export default function App() {
           <button type="button" onClick={() => handleMobileTabClick('roadmap')} className={currentTab === 'roadmap' ? 'is-active' : ''} aria-current={currentTab === 'roadmap' ? 'page' : undefined}>
             <Route size={19} /><span>Progress</span>
           </button>
-          <button type="button" onClick={() => { setCurrentTab('flashcards'); setFlashcardTarget(null); setIsFlashcardModalOpen(true); }} className={currentTab === 'flashcards' ? 'is-active' : ''} aria-current={currentTab === 'flashcards' ? 'page' : undefined}>
+          <button type="button" onClick={() => handleMobileTabClick('community')} className={currentTab === 'community' ? 'is-active' : ''} aria-current={currentTab === 'community' ? 'page' : undefined}>
+            <UsersRound size={19} /><span>Community</span>
+          </button>
+          <button type="button" onClick={() => handleMobileTabClick('flashcards')} className={currentTab === 'flashcards' ? 'is-active' : ''} aria-current={currentTab === 'flashcards' ? 'page' : undefined}>
             <Layers size={19} /><span>Cards</span>
           </button>
         </nav>

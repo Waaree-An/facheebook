@@ -434,11 +434,11 @@ html:not([data-theme="light"]) .fb-footer-youtube:hover {
   .fb-overview-label { font-size: 9px; letter-spacing: .04em; }
   .fb-mobile-dock {
     position: fixed; z-index: 50; left: 10px; right: 10px; bottom: calc(9px + env(safe-area-inset-bottom));
-    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px;
+    display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px;
     padding: 7px; border: 1px solid rgba(244,199,91,.25); border-radius: 19px;
     background: rgba(8,10,11,.96); box-shadow: 0 12px 36px rgba(0,0,0,.4); backdrop-filter: blur(18px);
   }
-  .fb-mobile-dock button { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 4px; min-width: 0; min-height: 48px; padding: 4px 1px; border-radius: 12px; color: #A8A29E; font-size: 10px; line-height: 1.1; font-weight: 800; }
+  .fb-mobile-dock button { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 4px; min-width: 0; min-height: 48px; padding: 4px 1px; border-radius: 12px; color: #A8A29E; font-size: 9px; line-height: 1.1; font-weight: 800; }
   .fb-mobile-dock button span { white-space: nowrap; }
   .fb-mobile-dock button:active { transform: scale(.98); }
   .fb-mobile-dock button.is-active { color: #F4C75B; background: rgba(244,199,91,.1); }
