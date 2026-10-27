@@ -1431,6 +1431,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
               )}
               {currentStep < 3 ? (
                 <button
+                  key="next-step"
                   type="button"
                   disabled={isProcessingAttachments || isRecordingVideo}
                   onClick={goToNextStep}
@@ -1440,6 +1441,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
                 </button>
               ) : (
                 <button
+                  key="save-material"
                   type="submit"
                   disabled={isProcessingAttachments || isRecordingVideo}
                   className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto"
