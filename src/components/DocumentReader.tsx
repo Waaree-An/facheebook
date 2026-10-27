@@ -211,7 +211,7 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({ file, onDownload
     : 'flex h-[72vh] min-h-[24rem] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-100';
 
   return (
-    <section className={readerClass} aria-label={`Document reader: ${file.name}`}>
+    <section className={`${readerClass} ${pdf ? '' : 'fb-document-reader--light'}`} aria-label={`Document reader: ${file.name}`}>
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 py-2 sm:px-4">
         <div className="flex min-w-0 items-center gap-2">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800">
@@ -324,7 +324,7 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({ file, onDownload
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-auto p-2 sm:p-4">
+      <div className="fb-document-reader-content min-h-0 flex-1 overflow-auto p-2 sm:p-4">
         {isLoading && (
           <div role="status" className="flex min-h-40 items-center justify-center text-sm font-semibold text-slate-600">
             <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-700" />
@@ -359,7 +359,7 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({ file, onDownload
           </div>
         )}
         {docx && file.dataUrl && !loadError && (
-          <div className={`fb-docx-preview mx-auto max-w-5xl rounded-md bg-white p-3 shadow-sm sm:p-6 ${isLoading ? 'hidden' : ''}`}>
+          <div className={`fb-docx-preview fb-preview-paper mx-auto max-w-5xl rounded-md p-3 shadow-sm sm:p-6 ${isLoading ? 'hidden' : ''}`}>
             <div ref={docxStylesRef} />
             <div ref={docxBodyRef} />
           </div>
@@ -375,7 +375,7 @@ export const DocumentReader: React.FC<DocumentReaderProps> = ({ file, onDownload
           </Suspense>
         )}
         {(plainText || ((pdf || docx) && !file.dataUrl && typeof file.textContent === 'string')) && !loadError && !isLoading && (
-          <pre className="mx-auto max-w-5xl whitespace-pre-wrap break-words rounded-xl bg-white p-4 font-mono text-sm leading-7 text-slate-800 shadow-sm sm:p-6">
+          <pre className="fb-preview-paper mx-auto max-w-5xl whitespace-pre-wrap break-words rounded-xl p-4 font-mono text-sm leading-7 shadow-sm sm:p-6">
             {text}
           </pre>
         )}

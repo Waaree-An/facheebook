@@ -472,12 +472,22 @@ html:not([data-theme="light"]) .fb-footer-youtube:hover {
 .fb-docx-preview .docx-wrapper { max-width: 100%; background: transparent; padding: 0; }
 .fb-docx-preview section.docx { margin: 0 auto 1rem; box-shadow: 0 1px 5px rgba(15, 23, 42, .12); }
 .fb-docx-preview img { max-width: 100%; height: auto; }
-html:not([data-theme="light"]) .fb-docx-preview section.docx {
-  background-color: #111619 !important;
-  color: #f5f5f4 !important;
+.fb-document-reader--light {
+  background-color: #e8eaed !important;
 }
-html:not([data-theme="light"]) .fb-docx-preview section.docx * {
-  color: #f5f5f4 !important;
+.fb-document-reader--light .fb-document-reader-content {
+  background-color: #e8eaed !important;
+}
+.fb-preview-paper {
+  background-color: #fff !important;
+  color: #1f2937 !important;
+}
+.fb-docx-preview section.docx {
+  background-color: #fff !important;
+}
+.fb-preview-paper pre,
+.fb-preview-paper code {
+  color: #1f2937;
 }
 
 /* Legacy blue utility classes are intentionally translated into the brand palette. */

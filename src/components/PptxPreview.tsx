@@ -79,7 +79,7 @@ export function PptxPreview({ file }: PptxPreviewProps) {
         </div>
       )}
 
-      <div className="flex min-h-[16rem] flex-1 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white p-2 shadow-sm sm:p-4">
+      <div className="fb-preview-paper flex min-h-[16rem] flex-1 items-center justify-center overflow-hidden rounded-xl border border-slate-200 p-2 shadow-sm sm:p-4">
         {(isLoading || (bytes && !slideCount && !loadError)) && (
           <div role="status" className="flex items-center text-sm font-semibold text-slate-600">
             <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-700" />
