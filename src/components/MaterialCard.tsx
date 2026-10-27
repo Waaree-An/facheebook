@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { ReadingMaterial, ReadingStatus } from '../types';
 import confetti from 'canvas-confetti';
+import { DeleteMaterialDialog } from './DeleteMaterialDialog';
 
 interface MaterialCardProps {
   material: ReadingMaterial;
@@ -45,6 +46,7 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
   onUpdateProgress,
   onRefreshActivity,
 }) => {
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const percent =
     material.totalPages > 0
       ? Math.min(
@@ -212,7 +214,7 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
           {getStatusBadge(material.status)}
         </div>
 
-        <h3 className="mb-1.5 line-clamp-2 text-base font-extrabold leading-snug text-slate-950 transition-colors group-hover:text-blue-800">
+        <h3 className="mb-1.5 break-words text-base font-extrabold leading-snug text-slate-900 [overflow-wrap:anywhere]">
           {material.title}
         </h3>
 
@@ -278,7 +280,9 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
             </span>
 
             <span className="font-mono font-extrabold text-blue-900">
-              {material.pagesRead} / {material.totalPages} pages ({percent}%)
+              {material.totalPages > 0
+                ? `${material.pagesRead} / ${material.totalPages} pages (${percent}%)`
+                : `${material.pagesRead} pages read · total not set`}
             </span>
           </div>
 
@@ -363,9 +367,7 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                if (confirm(`Delete "${material.title}"?`)) {
-                  onDelete(material.id);
-                }
+                setIsDeleteDialogOpen(true);
               }}
               className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-rose-200 bg-white text-rose-700 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
               title="Delete Material"
@@ -376,6 +378,16 @@ export const MaterialCard: React.FC<MaterialCardProps> = ({
           </div>
         </div>
       </div>
+      {isDeleteDialogOpen && (
+        <DeleteMaterialDialog
+          materialTitle={material.title}
+          onCancel={() => setIsDeleteDialogOpen(false)}
+          onConfirm={() => {
+            setIsDeleteDialogOpen(false);
+            onDelete(material.id);
+          }}
+        />
+      )}
     </div>
   );
 };

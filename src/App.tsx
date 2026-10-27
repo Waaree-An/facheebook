@@ -1140,6 +1140,7 @@ export default function App() {
   };
 
   const handleMobileTabClick = (tab: 'home' | 'materials' | 'roadmap' | 'community' | 'flashcards') => {
+    setSelectedMaterialDetail(null);
     if (currentTab === tab) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
@@ -1293,6 +1294,7 @@ export default function App() {
         currentTab={currentTab}
         onSelectTab={(tab) => {
           setCurrentTab(tab);
+          setSelectedMaterialDetail(null);
           if (tab === 'flashcards') {
             setFlashcardTarget(null);
             setIsFlashcardModalOpen(true);
@@ -1595,7 +1597,7 @@ export default function App() {
             <div className="space-y-6">
               <section className="rounded-3xl border border-amber-200 bg-gradient-to-br from-slate-900 to-slate-800 p-5 text-white shadow-sm sm:p-6">
                 <p className="text-xs font-bold uppercase tracking-wider text-amber-300">Learn together</p>
-                <h1 className="mt-1 text-2xl font-black">Student Community</h1>
+                <h1 className="mt-1 text-2xl font-black">Peers</h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
                   Discover shared study materials and practical tips from other students. Your personal Library and Tips stay separate.
                 </p>
@@ -1857,14 +1859,27 @@ export default function App() {
           <button type="button" onClick={() => handleMobileTabClick('materials')} className={currentTab === 'materials' ? 'is-active' : ''} aria-current={currentTab === 'materials' ? 'page' : undefined}>
             <BookOpen size={19} /><span>Library</span>
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedMaterialDetail(null);
+              setCurrentTab('home');
+              window.setTimeout(() => {
+                document.getElementById('daily-study-goals')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }, 0);
+            }}
+            aria-label="Today's study goals"
+          >
+            <Target size={19} /><span>Today</span>
+          </button>
           <button type="button" onClick={() => { setEditingMaterial(null); setIsAddModalOpen(true); }} className="fb-dock-add" aria-label="Add study material">
             <Plus size={21} /><span>Add</span>
           </button>
           <button type="button" onClick={() => handleMobileTabClick('roadmap')} className={currentTab === 'roadmap' ? 'is-active' : ''} aria-current={currentTab === 'roadmap' ? 'page' : undefined}>
             <Route size={19} /><span>Progress</span>
           </button>
-          <button type="button" onClick={() => handleMobileTabClick('community')} className={currentTab === 'community' ? 'is-active' : ''} aria-current={currentTab === 'community' ? 'page' : undefined}>
-            <UsersRound size={19} /><span>Community</span>
+          <button type="button" onClick={() => handleMobileTabClick('community')} className={currentTab === 'community' ? 'is-active' : ''} aria-current={currentTab === 'community' ? 'page' : undefined} aria-label="Peers">
+            <UsersRound size={19} /><span>Peers</span>
           </button>
           <button type="button" onClick={() => handleMobileTabClick('flashcards')} className={currentTab === 'flashcards' ? 'is-active' : ''} aria-current={currentTab === 'flashcards' ? 'page' : undefined}>
             <Layers size={19} /><span>Cards</span>

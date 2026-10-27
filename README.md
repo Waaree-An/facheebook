@@ -366,7 +366,9 @@ This pass preserves the existing Step 11 feature set and makes the brand and fir
 
 - Standardized the visual palette around charcoal `#080A0B`, surface `#111619`, raised surface `#1B242A`, gold `#F4C75B`, and deep gold `#B8860B`.
 - Replaced several leftover blue/pale gradient surfaces with dark-and-gold surfaces.
-- Simplified **Add study material**: title and subject stay up front; course metadata and study notes are optional expandable sections.
+- Guided **Add study material** into three steps: basic details, attachments, then organization and reading progress. Subject and course fields start blank, and PDF page totals are detected automatically when possible.
+- Added a **Today** shortcut beside **Add** in the mobile dock, made the full Progress label fit on mobile, renamed the student-community shortcut to **Connect**, and allowed material titles to wrap instead of relying on hover.
+- Material detail views now close when another navigation destination is chosen; delete actions use an in-app confirmation dialog. PPTX previews load the Vite-emitted WASM asset explicitly, and DOCX text remains readable in dark mode.
 - Added a local-library fallback when Supabase configuration is missing so the setup screen cannot permanently hide the existing study features. This mode is local-only and does not claim cloud sync.
 - Kept existing IndexedDB database naming intact to protect local browser data.
 - Removed `.env.local` from the distributed archive; copy your own file into the project root after extraction.

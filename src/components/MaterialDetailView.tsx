@@ -9,6 +9,7 @@ import { formatBytes, getEmbedVideoUrl } from '../utils/storage';
 import { isPdfDocument } from '../utils/pdfHelper';
 import { getAttachmentFormat, isTextAttachment } from '../utils/documentFiles';
 import confetti from 'canvas-confetti';
+import { DeleteMaterialDialog } from './DeleteMaterialDialog';
 
 const DocumentReader = lazy(() => import('./DocumentReader').then((module) => ({ default: module.DocumentReader })));
 
@@ -48,6 +49,7 @@ export const MaterialDetailView: React.FC<MaterialDetailViewProps> = ({
   const [masteredTakeaways, setMasteredTakeaways] = useState<number[]>([]);
   const [copiedCode, setCopiedCode] = useState(false);
   const [downloadError, setDownloadError] = useState('');
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   // Toggle mastered takeaway
   const toggleMastered = (idx: number) => {
@@ -155,14 +157,10 @@ export const MaterialDetailView: React.FC<MaterialDetailViewProps> = ({
           </button>
 
           <button
-            onClick={() => {
-              if (confirm(`Delete "${material.title}"?`)) {
-                onDelete(material.id);
-                onBack();
-              }
-            }}
+            onClick={() => setIsDeleteDialogOpen(true)}
             className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
             title="Delete Material"
+            aria-label="Delete material"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -236,7 +234,9 @@ export const MaterialDetailView: React.FC<MaterialDetailViewProps> = ({
               {percent}%
             </div>
             <p className="text-xs text-slate-500 font-medium mb-3">
-              {material.pagesRead} of {material.totalPages} pages finished
+              {material.totalPages > 0
+                ? `${material.pagesRead} of ${material.totalPages} pages finished`
+                : `${material.pagesRead} pages read · set a total to track progress`}
             </p>
 
             <div className="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden mb-3">
@@ -255,7 +255,9 @@ export const MaterialDetailView: React.FC<MaterialDetailViewProps> = ({
                   confetti({ particleCount: 70, spread: 60 });
                 }
               }}
-              className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer"
+              disabled={material.totalPages <= 0}
+              title={material.totalPages <= 0 ? 'Set the total pages in Edit Material to track page progress.' : undefined}
+              className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
             >
               +10 Pages Read
             </button>
@@ -274,7 +276,7 @@ export const MaterialDetailView: React.FC<MaterialDetailViewProps> = ({
           }`}
         >
           <FileText className="w-4 h-4" />
-          <span>Documents of Any Format ({material.documents.length})</span>
+          <span>Files &amp; Documents ({material.documents.length})</span>
         </button>
 
         <button
@@ -338,16 +340,16 @@ export const MaterialDetailView: React.FC<MaterialDetailViewProps> = ({
         </button>
       </div>
 
-      {/* Tab 1: Documents of Any Format */}
+      {/* Tab 1: Files & Documents */}
       {activeTab === 'docs' && (
         <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs p-6 space-y-6">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-black text-slate-900 text-base">
-                Stored Documents ({material.documents.length})
+                Files &amp; Documents ({material.documents.length})
               </h3>
               <p className="text-xs text-slate-500">
-                PDFs, Word docs, code files, presentations, spreadsheets, and archives of any format
+                PDFs, Word files, code, presentations, spreadsheets, and other supported files
               </p>
             </div>
           </div>
@@ -355,12 +357,12 @@ export const MaterialDetailView: React.FC<MaterialDetailViewProps> = ({
           {material.documents.length === 0 ? (
             <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-2xl">
               <FileText className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-              <p className="text-xs font-bold text-slate-600">No documents attached yet</p>
+              <p className="text-xs font-bold text-slate-600">No files attached yet</p>
               <button
                 onClick={() => onEdit(material)}
                 className="mt-2 text-xs font-bold text-indigo-600 hover:underline"
               >
-                + Add Documents to this Reading Material
+                + Add files to this material
               </button>
             </div>
           ) : (
@@ -886,6 +888,17 @@ export const MaterialDetailView: React.FC<MaterialDetailViewProps> = ({
         </div>
       )}
 
+      {isDeleteDialogOpen && (
+        <DeleteMaterialDialog
+          materialTitle={material.title}
+          onCancel={() => setIsDeleteDialogOpen(false)}
+          onConfirm={() => {
+            setIsDeleteDialogOpen(false);
+            onDelete(material.id);
+            onBack();
+          }}
+        />
+      )}
     </div>
   );
 };

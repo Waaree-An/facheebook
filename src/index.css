@@ -434,11 +434,11 @@ html:not([data-theme="light"]) .fb-footer-youtube:hover {
   .fb-overview-label { font-size: 9px; letter-spacing: .04em; }
   .fb-mobile-dock {
     position: fixed; z-index: 50; left: 10px; right: 10px; bottom: calc(9px + env(safe-area-inset-bottom));
-    display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px;
+    display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px;
     padding: 7px; border: 1px solid rgba(244,199,91,.25); border-radius: 19px;
     background: rgba(8,10,11,.96); box-shadow: 0 12px 36px rgba(0,0,0,.4); backdrop-filter: blur(18px);
   }
-  .fb-mobile-dock button { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 4px; min-width: 0; min-height: 48px; padding: 4px 1px; border-radius: 12px; color: #A8A29E; font-size: 9px; line-height: 1.1; font-weight: 800; }
+  .fb-mobile-dock button { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 4px; min-width: 0; min-height: 48px; padding: 4px 1px; border-radius: 12px; color: #A8A29E; font-size: 8.5px; line-height: 1.1; font-weight: 800; }
   .fb-mobile-dock button span { white-space: nowrap; }
   .fb-mobile-dock button:active { transform: scale(.98); }
   .fb-mobile-dock button.is-active { color: #F4C75B; background: rgba(244,199,91,.1); }
@@ -447,14 +447,22 @@ html:not([data-theme="light"]) .fb-footer-youtube:hover {
   .fb-search-tools kbd { display: none; }
 }
 @media (max-width: 480px) {
-  .fb-primary-nav { gap: 2px; }
-  .fb-primary-nav-button { flex: 1 1 0%; min-width: 0; gap: 4px; padding-inline: 6px; font-size: 11px; }
+  .fb-primary-nav { justify-content: space-between; gap: 4px; }
+  .fb-primary-nav .fb-primary-nav-button {
+    flex: 0 0 auto;
+    min-width: max-content;
+    min-height: 36px;
+    gap: 0;
+    padding-inline: 7px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .fb-primary-nav .fb-primary-nav-button svg { display: none; }
   .fb-material-filter-select,
   .fb-material-filter-select option { font-size: 13px !important; }
 }
 @media (max-width: 360px) {
-  .fb-primary-nav-button { gap: 2px; padding-inline: 3px; font-size: 9px; }
-  .fb-primary-nav-button svg { width: 14px; height: 14px; }
+  .fb-primary-nav .fb-primary-nav-button { padding-inline: 5px; font-size: 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
@@ -464,6 +472,13 @@ html:not([data-theme="light"]) .fb-footer-youtube:hover {
 .fb-docx-preview .docx-wrapper { max-width: 100%; background: transparent; padding: 0; }
 .fb-docx-preview section.docx { margin: 0 auto 1rem; box-shadow: 0 1px 5px rgba(15, 23, 42, .12); }
 .fb-docx-preview img { max-width: 100%; height: auto; }
+html:not([data-theme="light"]) .fb-docx-preview section.docx {
+  background-color: #111619 !important;
+  color: #f5f5f4 !important;
+}
+html:not([data-theme="light"]) .fb-docx-preview section.docx * {
+  color: #f5f5f4 !important;
+}
 
 /* Legacy blue utility classes are intentionally translated into the brand palette. */
 .text-blue-950, .text-blue-900, .text-blue-800, .text-blue-700, .text-blue-600 { color: #F4C75B !important; }

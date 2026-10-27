@@ -135,7 +135,7 @@ export const DailyStudyGoalTracker: React.FC<DailyStudyGoalTrackerProps> = ({
   const unreviewedMaterials = materials.filter((m) => !goal.materialsReviewedIds.includes(m.id));
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden transition-all">
+    <div id="daily-study-goals" className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden transition-all">
       {/* Top Banner & Control Bar */}
       <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-[#111619] via-[#111619] to-[#1B242A] border-b border-slate-100">
         <div className="flex items-center gap-3">
@@ -145,7 +145,7 @@ export const DailyStudyGoalTracker: React.FC<DailyStudyGoalTrackerProps> = ({
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
-                Daily Study Goal Tracker
+                Today's goals
               </h3>
               
               {/* Date Badge */}
@@ -181,7 +181,7 @@ export const DailyStudyGoalTracker: React.FC<DailyStudyGoalTrackerProps> = ({
               ) : null}
             </div>
             <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-              Set target pages to read and materials to review each day to keep momentum.
+              Track today's reading and reviews in one place.
             </p>
           </div>
         </div>

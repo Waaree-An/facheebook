@@ -26,15 +26,15 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
 
   // Form State
   const [title, setTitle] = useState(initialData?.title || '');
-  const [subject, setSubject] = useState(initialData?.subject || 'Computer Science');
+  const [subject, setSubject] = useState(initialData?.subject || '');
   const [author, setAuthor] = useState(initialData?.author || '');
   const [professor, setProfessor] = useState(initialData?.professor || '');
-  const [semester, setSemester] = useState(initialData?.semester || 'Fall 2026');
+  const [semester, setSemester] = useState(initialData?.semester || '');
   const [description, setDescription] = useState(initialData?.description || '');
   const [status, setStatus] = useState<ReadingStatus>(initialData?.status || 'reading');
   const [priority, setPriority] = useState<ReadingMaterial['priority']>(initialData?.priority || 'medium');
   const [rating, setRating] = useState<number>(initialData?.rating || 4);
-  const [totalPages, setTotalPages] = useState<number>(initialData?.totalPages || 30);
+  const [totalPages, setTotalPages] = useState<number>(initialData?.totalPages ?? 0);
   const [pagesRead, setPagesRead] = useState<number>(initialData?.pagesRead || 0);
   const [tagsInput, setTagsInput] = useState<string>(initialData?.tags?.join(', ') || '');
   const [notesMarkdown, setNotesMarkdown] = useState<string>(initialData?.notesMarkdown || '');
@@ -66,6 +66,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
   const [cameraMode, setCameraMode] = useState<'photo' | 'short_video'>('photo');
   const [isRecordingVideo, setIsRecordingVideo] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
@@ -87,6 +88,27 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
   const [aiNotice, setAiNotice] = useState<string | null>(null);
   const [attachmentNotice, setAttachmentNotice] = useState<string | null>(null);
   const [isProcessingAttachments, setIsProcessingAttachments] = useState(false);
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+
+  const goToNextStep = () => {
+    if (currentStep === 1 && !title.trim()) {
+      const titleInput = document.getElementById('material-title');
+      if (titleInput instanceof HTMLInputElement) {
+        titleInput.setCustomValidity('Enter a title to continue.');
+        titleInput.reportValidity();
+        titleInput.setCustomValidity('');
+        titleInput.focus();
+      }
+      return;
+    }
+    setCurrentStep((step) => (step === 1 ? 2 : 3));
+    formRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const goToPreviousStep = () => {
+    setCurrentStep((step) => (step === 3 ? 2 : 1));
+    formRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   // File Inputs Refs
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -168,6 +190,8 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
     let runningTotal = attachmentBytes();
     const accepted: FileAttachment[] = [];
     const rejected: string[] = [];
+    let detectedPdfPages = 0;
+    let pdfPageCountFailed = false;
 
     try {
       for (const file of files) {
@@ -192,19 +216,40 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
           continue;
         }
         try {
-          accepted.push(await makeAttachment(file, kind));
+          const attachment = await makeAttachment(file, kind);
+          accepted.push(attachment);
+          if (kind === 'document' && file.name.toLowerCase().endsWith('.pdf')) {
+            try {
+              const [pdfjs, worker] = await Promise.all([
+                import('pdfjs-dist'),
+                import('pdfjs-dist/build/pdf.worker.min.mjs?url'),
+              ]);
+              pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+              const task = pdfjs.getDocument({ data: await file.arrayBuffer() });
+              const pdf = await task.promise;
+              detectedPdfPages += pdf.numPages;
+              await pdf.destroy();
+            } catch (error) {
+              console.warn(`Could not read the page count for ${file.name}:`, error);
+              pdfPageCountFailed = true;
+            }
+          }
           runningTotal += file.size;
         } catch (error) {
           rejected.push(`${file.name}: ${error instanceof Error ? error.message : 'read failed'}`);
         }
       }
       if (accepted.length) setItems(current => [...current, ...accepted]);
+      if (detectedPdfPages > 0) setTotalPages((current) => current + detectedPdfPages);
       if (rejected.length) {
         const shown = rejected.slice(0, 3).join(' · ');
         const extra = rejected.length > 3 ? ` · and ${rejected.length - 3} more` : '';
         setAttachmentNotice(`${accepted.length ? `Added ${accepted.length} file(s). ` : ''}${rejected.length} file(s) skipped: ${shown}${extra}.`);
       } else if (accepted.length) {
         setAttachmentNotice(`Successfully added ${accepted.length} file${accepted.length === 1 ? '' : 's'}.`);
+      }
+      if (pdfPageCountFailed) {
+        setAttachmentNotice((current) => `${current ? `${current} ` : ''}Could not detect a PDF page count; you can enter it manually.`);
       }
     } finally {
       setIsProcessingAttachments(false);
@@ -502,8 +547,12 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (currentStep < 3) {
+      goToNextStep();
+      return;
+    }
     if (!title.trim() || isProcessingAttachments || isRecordingVideo) return;
-    const safeTotalPages = Math.max(1, Math.floor(Number(totalPages) || 1));
+    const safeTotalPages = Math.max(0, Math.floor(Number(totalPages) || 0));
     const safePagesRead = Math.min(safeTotalPages, Math.max(0, Math.floor(Number(pagesRead) || 0)));
 
     const tags = tagsInput
@@ -514,8 +563,8 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
     const updatedMaterial: ReadingMaterial = {
       id: initialData?.id || 'mat_' + Date.now(),
       title: title.trim(),
-      subject: subject.trim() || 'General Studies',
-      author: author.trim() || 'Academic Reference',
+      subject: subject.trim(),
+      author: author.trim(),
       professor: professor.trim() || undefined,
       semester: semester.trim() || undefined,
       description: description.trim(),
@@ -579,10 +628,31 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
         </div>
 
         {/* Modal Form Scrollable Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6">
+        <form ref={formRef} onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6">
+          <div className="grid grid-cols-3 gap-2" aria-label="Material setup steps">
+            {[
+              { step: 1, title: 'Details' },
+              { step: 2, title: 'Attachments' },
+              { step: 3, title: 'Organize' },
+            ].map(({ step, title: stepTitle }) => (
+              <div
+                key={step}
+                aria-current={currentStep === step ? 'step' : undefined}
+                className={`rounded-xl px-2 py-2 text-center text-xs font-bold ${
+                  currentStep === step
+                    ? 'bg-indigo-100 text-indigo-900'
+                    : currentStep > step
+                      ? 'bg-emerald-50 text-emerald-800'
+                      : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                <span className="mr-1">{step}.</span>{stepTitle}
+              </div>
+            ))}
+          </div>
 
           {/* Section 1: Core Material Info */}
-          <div className="space-y-4">
+          <div hidden={currentStep !== 1} className="space-y-4">
             <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
               <h3 className="text-xs font-black tracking-wider text-indigo-900 uppercase">
                 1. Material Information & Course Details
@@ -617,8 +687,8 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
                 </label>
 
                 <input
+                  id="material-title"
                   type="text"
-                  required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Molecular Biology Chapter 4: DNA Repair Mechanisms"
@@ -635,7 +705,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
                   type="text"
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
-                  placeholder="e.g. Computer Science, Organic Chemistry, History"
+                  placeholder="e.g. Physics Gr10, Computer Science"
                   className="w-full px-3.5 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
                 />
               </div>
@@ -654,7 +724,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
                   type="text"
                   value={author}
                   onChange={(e) => setAuthor(e.target.value)}
-                  placeholder="e.g. Thomas H. Cormen, Charles E. Leiserson"
+                  placeholder="e.g. MD Fedis, Thomas H. Cormen"
                   className="w-full px-3.5 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
                 />
               </div>
@@ -668,7 +738,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
                   type="text"
                   value={professor}
                   onChange={(e) => setProfessor(e.target.value)}
-                  placeholder="e.g. Dr. Rivera"
+                  placeholder="e.g. Temam Sh, Sufiyan, Nure"
                   className="w-full px-3.5 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
                 />
               </div>
@@ -689,8 +759,9 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
                 </div>
               </details>
             </div>
+          </div>
 
-            {/* The only workflow choice kept in the primary form. */}
+          <div hidden={currentStep !== 3} className="space-y-4">
             <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3">
               <label className="block text-xs font-bold text-slate-700 mb-1" htmlFor="material-status">
                 Status
@@ -731,7 +802,8 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-slate-600 mb-1" htmlFor="material-total-pages">Total pages</label>
-                <input id="material-total-pages" type="number" min="1" value={totalPages} onChange={(e) => setTotalPages(Number(e.target.value))} className="w-full px-2.5 py-2 text-sm bg-white border border-slate-200 rounded-xl font-semibold outline-none" />
+                <input id="material-total-pages" type="number" min="0" value={totalPages} onChange={(e) => setTotalPages(Number(e.target.value))} className="w-full px-2.5 py-2 text-sm bg-white border border-slate-200 rounded-xl font-semibold outline-none" />
+                <p className="mt-1 text-[10px] text-slate-500">PDF page counts are detected automatically; adjust this if needed.</p>
               </div>
             </div>
             <div>
@@ -890,6 +962,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
             </details>
           </div>
 
+          <div hidden={currentStep !== 2} className="space-y-5">
           <hr className="border-slate-200" />
 
           {/* Camera Viewport if Active */}
@@ -1255,7 +1328,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
                 <FileText className="w-4 h-4 text-purple-600" />
 
                 <h3 className="text-xs font-black tracking-wider text-slate-800 uppercase">
-                  5. Document Files of Any Format ({documents.length})
+                  5. Files & Documents ({documents.length})
                 </h3>
               </div>
 
@@ -1266,7 +1339,7 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
                 className="flex w-full items-center justify-center gap-1 px-3 py-2 sm:w-auto sm:py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-xs font-semibold disabled:opacity-50"
               >
                 <UploadCloud className="w-3.5 h-3.5" />
-                <span>Upload Any Documents</span>
+                <span>Upload Files</span>
               </button>
 
               <input
@@ -1333,9 +1406,10 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
             )}
           </div>
 
-          {/* Modal Footer Buttons */}
-          <div className="pt-4 border-t border-slate-200 flex flex-col-reverse items-stretch justify-end gap-2 sm:flex-row sm:items-center sm:gap-3">
+          </div>
 
+          {/* Modal Footer Buttons */}
+          <div className="pt-4 border-t border-slate-200 flex flex-col-reverse items-stretch justify-between gap-2 sm:flex-row sm:items-center sm:gap-3">
             <button
               type="button"
               onClick={handleClose}
@@ -1345,19 +1419,36 @@ export const MaterialModal: React.FC<MaterialModalProps> = ({
               Cancel
             </button>
 
-            <button
-              type="submit"
-              disabled={isProcessingAttachments || isRecordingVideo}
-              className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto"
-            >
-              <Check className="w-4 h-4" />
-
-              <span>
-                {initialData
-                  ? 'Save Changes'
-                  : 'Save Reading Material'}
-              </span>
-            </button>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row">
+              {currentStep > 1 && (
+                <button
+                  type="button"
+                  onClick={goToPreviousStep}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-700 border border-slate-200 hover:bg-slate-100"
+                >
+                  Previous
+                </button>
+              )}
+              {currentStep < 3 ? (
+                <button
+                  type="button"
+                  disabled={isProcessingAttachments || isRecordingVideo}
+                  onClick={goToNextStep}
+                  className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 disabled:opacity-50"
+                >
+                  Next
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={isProcessingAttachments || isRecordingVideo}
+                  className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md shadow-indigo-600/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>{initialData ? 'Save Changes' : 'Save Reading Material'}</span>
+                </button>
+              )}
+            </div>
           </div>
         </form>
       </div>

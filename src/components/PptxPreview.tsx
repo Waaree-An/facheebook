@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { PresentationViewer } from 'pptx-wasm/react';
 import type { PresentationInfo } from 'pptx-wasm';
+import pptxWasmUrl from 'pptx-wasm/wasm?url';
 import type { FileAttachment } from '../types';
 
 interface PptxPreviewProps {
@@ -95,6 +96,7 @@ export function PptxPreview({ file }: PptxPreviewProps) {
         {bytes && !loadError && (
           <PresentationViewer
             src={bytes}
+            wasm={pptxWasmUrl}
             slide={slideNumber}
             width="100%"
             height="100%"

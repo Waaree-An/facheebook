@@ -134,7 +134,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'materials' as const, label: 'Library', icon: BookOpen },
     { id: 'roadmap' as const, label: 'Progress', icon: Route },
     { id: 'tips' as const, label: 'Tips', icon: Lightbulb },
-    { id: 'community' as const, label: 'Community', icon: UsersRound },
+    { id: 'community' as const, label: 'Peers', icon: UsersRound },
     { id: 'flashcards' as const, label: 'Cards', icon: Layers },
     { id: 'about' as const, label: 'About', icon: Heart },
   ];
@@ -347,7 +347,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={() => onSelectTab(id)}
                 aria-current={active ? 'page' : undefined}
                 aria-label={label}
-                className={`fb-primary-nav-button relative ${id === 'flashcards' || id === 'about' ? 'hidden sm:inline-flex' : 'inline-flex'} min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 sm:px-4 sm:text-sm ${
+                title={id === 'community' ? label : undefined}
+                className={`fb-primary-nav-button relative ${id === 'about' ? 'hidden sm:inline-flex' : 'inline-flex'} min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 sm:px-4 sm:text-sm ${
                   active
                     ? 'border-blue-300 bg-blue-100 text-blue-950 shadow-sm'
                     : 'border-transparent text-slate-700 hover:border-slate-300 hover:bg-slate-100 hover:text-slate-950'
