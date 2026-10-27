@@ -353,6 +353,8 @@ Refer to PROJECT\_HANDOVER.md for the project audit, known issues, and next-vers
 
 Attachment uploads now validate file types and sizes, report progress and failures visibly, and enforce per-file and per-material size limits to reduce the risk of exhausting browser storage. In-browser camera and video recording paths also check device support and clip sizes. See `FEATURE_TESTING.md` for the changes and manual test checklist.
 
+Material attachments stay in the browser's IndexedDB and are not uploaded to the app server. The material reader renders PDFs one page at a time with PDF.js, previews DOCX and PPTX files in the browser, and supports images and common text/code formats. PPTX previews render slides as a read-only canvas; animations and transitions are not shown, and some advanced Office effects may not match PowerPoint exactly. Legacy PPT, XLS/XLSX, DOC, and other formats remain downloadable originals with an explicit preview-unavailable message. PDF, DOCX, and PPTX processing stays on-device; the renderers are loaded only when opening a supported file. Attachments are limited to 20 MB each.
+
 ## Feature 05: Study timer
 
 See [FEATURE_05_STUDY_TIMER.md](./FEATURE_05_STUDY_TIMER.md) for the timer improvements and manual verification checklist. The timer now uses deadline-based elapsed-time tracking and stores session state locally.
@@ -375,7 +377,7 @@ Signed-in accounts now sync study materials and study tips across devices. Apply
 
 Each account has a separate local library. Existing signed-out device data stays local until the signed-in user explicitly chooses **Review and import**. Import merges by ID, asks for confirmation when duplicates exist, keeps the newer version, and preserves the original local library. Material and tip changes sync automatically when online; deletion records are retained and synced as soft-delete tombstones.
 
-Only study metadata and text sync. Attachment file data and voice recordings remain on the originating device; flashcards, study goals, timer state, and other progress are not cloud-synced. Cloud conflict resolution uses the record timestamps (the latest timestamp wins; ties keep the account copy). Test with separate accounts and devices before release. Android redirect behavior, privacy policy/data-safety declarations, signed App Bundle generation, and Play Console testing remain release tasks.
+Only study metadata and text sync. Attachment file data and voice recordings remain on the originating device; flashcards, study goals, timer state, and other progress are not cloud-synced. When cloud copies of a record differ, sync automatically applies the version with the newest record timestamp (the account copy wins ties), then offers a simple **Keep changes** or **Undo changes** choice. Undo restores the older version across the account and device. Test with separate accounts and devices before release. Android redirect behavior, privacy policy/data-safety declarations, signed App Bundle generation, and Play Console testing remain release tasks.
 
 ### Verification status
 

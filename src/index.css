@@ -460,6 +460,11 @@ html:not([data-theme="light"]) .fb-footer-youtube:hover {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 
+.fb-docx-preview { overflow-x: auto; }
+.fb-docx-preview .docx-wrapper { max-width: 100%; background: transparent; padding: 0; }
+.fb-docx-preview section.docx { margin: 0 auto 1rem; box-shadow: 0 1px 5px rgba(15, 23, 42, .12); }
+.fb-docx-preview img { max-width: 100%; height: auto; }
+
 /* Legacy blue utility classes are intentionally translated into the brand palette. */
 .text-blue-950, .text-blue-900, .text-blue-800, .text-blue-700, .text-blue-600 { color: #F4C75B !important; }
 .bg-blue-100, .bg-blue-50 { background-color: rgba(244,199,91,.10) !important; }

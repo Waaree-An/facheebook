@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import { 
   ArrowLeft, BookOpen, Image, Video, FileText, Link2, 
   Download, Eye, CheckCircle2, Star, Edit3, Trash2, 
@@ -6,8 +6,11 @@ import {
 } from 'lucide-react';
 import { ReadingMaterial, FileAttachment, VideoLink, ReadingStatus } from '../types';
 import { formatBytes, getEmbedVideoUrl } from '../utils/storage';
-import { isPdfDocument, getPdfDisplayUrl } from '../utils/pdfHelper';
+import { isPdfDocument } from '../utils/pdfHelper';
+import { getAttachmentFormat, isTextAttachment } from '../utils/documentFiles';
 import confetti from 'canvas-confetti';
+
+const DocumentReader = lazy(() => import('./DocumentReader').then((module) => ({ default: module.DocumentReader })));
 
 interface MaterialDetailViewProps {
   material: ReadingMaterial;
@@ -39,38 +42,12 @@ export const MaterialDetailView: React.FC<MaterialDetailViewProps> = ({
     material.shortVideos.length > 0 ? material.shortVideos[0] : null
   );
 
-  // PDF Document Viewer State
-  const [pdfViewMode, setPdfViewMode] = useState<'viewer' | 'text'>('viewer');
-  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
-
-  // Resolve PDF display URL (Blob or Data URL) when document changes
-  useEffect(() => {
-    if (!selectedDocPreview) {
-      setPdfBlobUrl(null);
-      return;
-    }
-
-    if (isPdfDocument(selectedDocPreview)) {
-      const displayInfo = getPdfDisplayUrl(selectedDocPreview);
-      if (displayInfo) {
-        setPdfBlobUrl(displayInfo.url);
-        setPdfViewMode('viewer');
-        return () => {
-          if (displayInfo.isObjectUrl) {
-            URL.revokeObjectURL(displayInfo.url);
-          }
-        };
-      }
-    } else {
-      setPdfBlobUrl(null);
-    }
-  }, [selectedDocPreview]);
-
   // Quiz state for this material
   const [quizIndex, setQuizIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [masteredTakeaways, setMasteredTakeaways] = useState<number[]>([]);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [downloadError, setDownloadError] = useState('');
 
   // Toggle mastered takeaway
   const toggleMastered = (idx: number) => {
@@ -83,31 +60,37 @@ export const MaterialDetailView: React.FC<MaterialDetailViewProps> = ({
   };
 
   // Download attachment
-  const handleDownload = (file: FileAttachment) => {
-    if (file.dataUrl) {
+  const handleDownload = async (file: FileAttachment) => {
+    setDownloadError('');
+    let objectUrl: string | null = null;
+    try {
+      let downloadUrl = file.dataUrl;
+      if (downloadUrl?.startsWith('data:')) {
+        const response = await fetch(downloadUrl);
+        if (!response.ok) throw new Error('The original file could not be prepared for download.');
+        objectUrl = URL.createObjectURL(await response.blob());
+        downloadUrl = objectUrl;
+      } else if (!downloadUrl && file.textContent && isTextAttachment(file)) {
+        objectUrl = URL.createObjectURL(new Blob([file.textContent], { type: 'text/plain' }));
+        downloadUrl = objectUrl;
+      }
+
+      if (!downloadUrl) {
+        setDownloadError(`The original file "${file.name}" is not available on this device.`);
+        return;
+      }
+
       const link = document.createElement('a');
-      link.href = file.dataUrl;
+      link.href = downloadUrl;
       link.download = file.name;
+      link.rel = 'noopener';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } else if (isPdfDocument(file) && pdfBlobUrl && selectedDocPreview?.id === file.id) {
-      const link = document.createElement('a');
-      link.href = pdfBlobUrl;
-      link.download = file.name;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } else if (file.textContent) {
-      const blob = new Blob([file.textContent], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = file.name;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      if (objectUrl) window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch (error) {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      setDownloadError(error instanceof Error ? error.message : 'The file could not be downloaded.');
     }
   };
 
@@ -383,18 +366,23 @@ export const MaterialDetailView: React.FC<MaterialDetailViewProps> = ({
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Document List Selector */}
-              <div className="space-y-2 lg:col-span-1">
+              <div className="flex gap-2 overflow-x-auto pb-1 lg:col-span-1 lg:flex-col lg:overflow-visible">
                 {material.documents.map((doc) => {
                   const isDocPdf = isPdfDocument(doc);
+                  const documentFormat = getAttachmentFormat(doc);
+                  const hasPreview = isDocPdf
+                    || documentFormat === 'docx'
+                    || documentFormat === 'pptx'
+                    || isTextAttachment(doc)
+                    || doc.dataUrl?.startsWith('data:image/') === true;
                   const isSelected = selectedDocPreview?.id === doc.id;
                   return (
                     <div
                       key={doc.id}
                       onClick={() => {
                         setSelectedDocPreview(doc);
-                        setPdfViewMode('viewer');
                       }}
-                      className={`p-3 rounded-2xl border cursor-pointer transition-all flex items-center justify-between ${
+                      className={`min-w-[15rem] rounded-2xl border p-3 cursor-pointer transition-all flex items-center justify-between lg:min-w-0 ${
                         isSelected
                           ? isDocPdf
                             ? 'bg-rose-50/80 border-rose-300 shadow-xs'
@@ -418,7 +406,7 @@ export const MaterialDetailView: React.FC<MaterialDetailViewProps> = ({
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
-                        {isDocPdf && (
+                        {hasPreview && (
                           <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700">
                             Preview
                           </span>
@@ -429,6 +417,7 @@ export const MaterialDetailView: React.FC<MaterialDetailViewProps> = ({
                             handleDownload(doc);
                           }}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                          disabled={!doc.dataUrl && !(doc.textContent && isTextAttachment(doc))}
                           title={`Download ${doc.name}`}
                         >
                           <Download className="w-4 h-4" />
@@ -440,224 +429,17 @@ export const MaterialDetailView: React.FC<MaterialDetailViewProps> = ({
               </div>
 
               {/* Document Reader / Preview Area */}
-              <div className="lg:col-span-2 bg-slate-50 rounded-2xl border border-slate-200 p-5 flex flex-col justify-between">
+              <div className="min-w-0 lg:col-span-2">
                 {selectedDocPreview ? (
-                  <div className="space-y-4">
-                    {/* If selected document is a PDF */}
-                    {isPdfDocument(selectedDocPreview) ? (
-                      <div className="space-y-4">
-                        {/* PDF Header Details & Action Bar */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="bg-rose-100 text-rose-800 font-mono text-[10px] font-black px-2 py-0.5 rounded-md uppercase flex items-center gap-1 border border-rose-200">
-                                <FileText className="w-3 h-3" />
-                                PDF Document
-                              </span>
-                              <h4 className="font-extrabold text-sm text-slate-900 truncate max-w-md">
-                                {selectedDocPreview.name}
-                              </h4>
-                            </div>
-                            <p className="text-[11px] text-slate-500 font-mono mt-0.5 flex items-center gap-2">
-                              <span>{formatBytes(selectedDocPreview.sizeBytes)}</span>
-                              <span>•</span>
-                              <span className="text-emerald-700 font-sans font-semibold">Embedded PDF Preview Active</span>
-                            </p>
-                          </div>
-
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {/* View Mode Toggle if text notes are also present */}
-                            {selectedDocPreview.textContent && (
-                              <div className="flex items-center rounded-xl bg-slate-200/80 p-0.5 text-xs font-bold">
-                                <button
-                                  onClick={() => setPdfViewMode('viewer')}
-                                  className={`px-2.5 py-1 rounded-lg transition-all ${
-                                    pdfViewMode === 'viewer'
-                                      ? 'bg-white text-slate-900 shadow-xs'
-                                      : 'text-slate-600 hover:text-slate-900'
-                                  }`}
-                                >
-                                  PDF Viewer
-                                </button>
-                                <button
-                                  onClick={() => setPdfViewMode('text')}
-                                  className={`px-2.5 py-1 rounded-lg transition-all ${
-                                    pdfViewMode === 'text'
-                                      ? 'bg-white text-slate-900 shadow-xs'
-                                      : 'text-slate-600 hover:text-slate-900'
-                                  }`}
-                                >
-                                  Notes & Text
-                                </button>
-                              </div>
-                            )}
-
-                            {/* Open in New Tab Button */}
-                            {pdfBlobUrl && (
-                              <a
-                                href={pdfBlobUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
-                                title="Open PDF in a new browser tab for full-screen reading"
-                              >
-                                <ExternalLink className="w-3.5 h-3.5 text-slate-600" />
-                                <span className="hidden sm:inline">Open Full</span>
-                              </a>
-                            )}
-
-                            {/* Download Button */}
-                            <button
-                              onClick={() => handleDownload(selectedDocPreview)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
-                              title="Download this PDF document"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                              <span>Download PDF</span>
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* PDF Viewer Body */}
-                        {pdfViewMode === 'viewer' ? (
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium px-1">
-                              <span className="flex items-center gap-1.5 text-slate-700 font-semibold">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                Rendered with browser default PDF viewer
-                              </span>
-                              <span className="text-slate-400">
-                                Interactive zoom, page navigation, and search enabled
-                              </span>
-                            </div>
-
-                            <div className="relative w-full rounded-2xl border border-slate-300 bg-slate-900 shadow-inner overflow-hidden">
-                              {pdfBlobUrl ? (
-                                <iframe
-                                  id="pdf-preview-embed-frame"
-                                  src={`${pdfBlobUrl}#toolbar=1&navpanes=1&statusbar=1`}
-                                  className="w-full h-[650px] sm:h-[750px] border-0 bg-white"
-                                  title={`PDF Preview: ${selectedDocPreview.name}`}
-                                />
-                              ) : (
-                                <div className="h-[450px] flex flex-col items-center justify-center text-slate-400 bg-slate-900 p-6 text-center space-y-2">
-                                  <FileText className="w-10 h-10 text-rose-400 animate-pulse" />
-                                  <p className="text-sm font-bold text-white">Preparing PDF document preview...</p>
-                                  <p className="text-xs text-slate-400">Loading document into viewer iframe</p>
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="flex items-center justify-between text-[11px] text-slate-500 bg-white p-2.5 rounded-xl border border-slate-200">
-                              <span className="text-slate-600">
-                                💡 Using your device's native browser PDF viewer controls (zoom, search, print, rotate).
-                              </span>
-                              {pdfBlobUrl && (
-                                <a
-                                  href={pdfBlobUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-rose-700 hover:text-rose-900 font-bold hover:underline flex items-center gap-1"
-                                >
-                                  <span>Open in standalone window</span>
-                                  <ExternalLink className="w-3 h-3" />
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                        ) : (
-                          /* Text View fallback */
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-[11px] text-slate-500 font-semibold">
-                              <span>Extracted Notes & Text</span>
-                              <button
-                                onClick={() => {
-                                  navigator.clipboard.writeText(selectedDocPreview.textContent || '');
-                                  setCopiedCode(true);
-                                  setTimeout(() => setCopiedCode(false), 2000);
-                                }}
-                                className="flex items-center gap-1 text-rose-700 hover:underline cursor-pointer"
-                              >
-                                {copiedCode ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                                <span>{copiedCode ? 'Copied!' : 'Copy Text'}</span>
-                              </button>
-                            </div>
-                            <pre className="bg-slate-950 text-slate-100 p-4 rounded-xl text-xs font-mono overflow-x-auto max-h-96 whitespace-pre-wrap leading-relaxed">
-                              {selectedDocPreview.textContent}
-                            </pre>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      /* Non-PDF Document formats */
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="bg-purple-200 text-purple-900 font-mono text-[10px] font-extrabold px-2 py-0.5 rounded-md uppercase">
-                                {selectedDocPreview.format}
-                              </span>
-                              <h4 className="font-extrabold text-sm text-slate-900 truncate">
-                                {selectedDocPreview.name}
-                              </h4>
-                            </div>
-                            <p className="text-[11px] text-slate-500 font-mono mt-0.5">
-                              {formatBytes(selectedDocPreview.sizeBytes)}
-                            </p>
-                          </div>
-
-                          <button
-                            onClick={() => handleDownload(selectedDocPreview)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            <span>Download File</span>
-                          </button>
-                        </div>
-
-                        {/* Text / Code File Preview */}
-                        {selectedDocPreview.textContent ? (
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-[11px] text-slate-500 font-semibold">
-                              <span>Document Text / Code Preview</span>
-                              <button
-                                onClick={() => {
-                                  navigator.clipboard.writeText(selectedDocPreview.textContent || '');
-                                  setCopiedCode(true);
-                                  setTimeout(() => setCopiedCode(false), 2000);
-                                }}
-                                className="flex items-center gap-1 text-purple-700 hover:underline cursor-pointer"
-                              >
-                                {copiedCode ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                                <span>{copiedCode ? 'Copied!' : 'Copy Content'}</span>
-                              </button>
-                            </div>
-                            <pre className="bg-slate-950 text-slate-100 p-4 rounded-xl text-xs font-mono overflow-x-auto max-h-96 whitespace-pre-wrap leading-relaxed">
-                              {selectedDocPreview.textContent}
-                            </pre>
-                          </div>
-                        ) : (
-                          <div className="text-center py-12 bg-white rounded-xl border border-slate-200">
-                            <FileText className="w-10 h-10 text-purple-400 mx-auto mb-2" />
-                            <h5 className="font-bold text-xs text-slate-800 mb-1">{selectedDocPreview.name}</h5>
-                            <p className="text-xs text-slate-500 mb-4">
-                              Binary / rich document format ({selectedDocPreview.format.toUpperCase()}). Ready for instant download.
-                            </p>
-                            <button
-                              onClick={() => handleDownload(selectedDocPreview)}
-                              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
-                            >
-                              <Download className="w-4 h-4" />
-                              <span>Download {selectedDocPreview.name}</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <Suspense fallback={<div role="status" className="flex h-[60vh] items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-600">Loading document reader...</div>}>
+                    <DocumentReader file={selectedDocPreview} onDownload={handleDownload} />
+                  </Suspense>
                 ) : (
-                  <p className="text-xs text-slate-400 text-center py-8">Select a document to preview</p>
+                  <div className="flex h-64 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-sm text-slate-500">
+                    Select a document to preview.
+                  </div>
                 )}
+                {downloadError && <p role="alert" className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800">{downloadError}</p>}
               </div>
             </div>
           )}

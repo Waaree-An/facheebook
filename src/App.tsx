@@ -37,7 +37,12 @@ import type { StudyCalendarEvent } from './types';
 import { useFacheeAuth } from './lib/AuthGate';
 import { isLocalDemoSession } from './lib/localDemoAuth';
 import { supabase } from './lib/supabase';
-import { recordStudyDeletion, syncStudyCollection } from './utils/cloudStudySync';
+import {
+  recordStudyDeletion,
+  syncStudyCollection,
+  type StudySyncConflict,
+} from './utils/cloudStudySync';
+import { StudySyncConflictModal } from './components/StudySyncConflictModal';
 import {
   applyThemePreference,
   getThemePreference,
@@ -469,9 +474,29 @@ export default function App() {
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>(() =>
     typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'
   );
-  const confirmSyncConflicts = (count: number) => window.confirm(
-    `This account and this device both have ${count} matching record ID${count === 1 ? '' : 's'} with different content. Continue using the latest record timestamp? If timestamps tie, the account copy is kept. Cancel to leave this collection unchanged.`
-  );
+  type ConflictRequest = {
+    conflicts: StudySyncConflict[];
+    resolve: (keepChanges: boolean) => void;
+  };
+  const conflictQueueRef = useRef<ConflictRequest[]>([]);
+  const activeConflictRef = useRef<ConflictRequest | null>(null);
+  const [activeConflict, setActiveConflict] = useState<ConflictRequest | null>(null);
+  const confirmAppliedConflicts = useCallback((conflicts: StudySyncConflict[]) => new Promise<boolean>((resolve) => {
+    const request = { conflicts, resolve };
+    if (activeConflictRef.current) {
+      conflictQueueRef.current.push(request);
+      return;
+    }
+    activeConflictRef.current = request;
+    setActiveConflict(request);
+  }), []);
+  const handleResolveSyncConflicts = (keepChanges: boolean) => {
+    const current = activeConflictRef.current;
+    const next = conflictQueueRef.current.shift() ?? null;
+    activeConflictRef.current = next;
+    setActiveConflict(next);
+    current?.resolve(keepChanges);
+  };
 
   // Signed-in accounts use separate local databases; signed-out study data stays local.
   useEffect(() => {
@@ -491,10 +516,10 @@ export default function App() {
           try {
             const syncedCollections = await withCloudSyncTimeout(async (signal) => {
               const syncedMaterials = await syncStudyCollection(
-                supabase, session.user.id, 'study_materials', nextMaterials, confirmSyncConflicts, signal,
+                supabase, session.user.id, 'study_materials', nextMaterials, confirmAppliedConflicts, signal,
               );
               const syncedTips = await syncStudyCollection(
-                supabase, session.user.id, 'study_tips', nextTips, confirmSyncConflicts, signal,
+                supabase, session.user.id, 'study_tips', nextTips, confirmAppliedConflicts, signal,
               );
               return { syncedMaterials, syncedTips };
             });
@@ -555,8 +580,8 @@ export default function App() {
     const timeout = window.setTimeout(async () => {
       try {
         const [mergedMaterials, mergedTips] = await Promise.all([
-          syncStudyCollection(supabase, session.user.id, 'study_materials', materials, confirmSyncConflicts),
-          syncStudyCollection(supabase, session.user.id, 'study_tips', tips, confirmSyncConflicts),
+          syncStudyCollection(supabase, session.user.id, 'study_materials', materials, confirmAppliedConflicts),
+          syncStudyCollection(supabase, session.user.id, 'study_tips', tips, confirmAppliedConflicts),
         ]);
         if (cancelled) return;
         setMaterials((current) => JSON.stringify(current) === JSON.stringify(mergedMaterials) ? current : mergedMaterials);
@@ -1200,10 +1225,10 @@ export default function App() {
       ]);
       const mergedCollections = await withCloudSyncTimeout(async (signal) => {
         const mergedMaterials = await syncStudyCollection(
-          supabase, session.user.id, 'study_materials', localMaterials ?? [], confirmSyncConflicts, signal,
+          supabase, session.user.id, 'study_materials', localMaterials ?? [], confirmAppliedConflicts, signal,
         );
         const mergedTips = await syncStudyCollection(
-          supabase, session.user.id, 'study_tips', localTips ?? [], confirmSyncConflicts, signal,
+          supabase, session.user.id, 'study_tips', localTips ?? [], confirmAppliedConflicts, signal,
         );
         return { mergedMaterials, mergedTips };
       });
@@ -1220,28 +1245,37 @@ export default function App() {
 
   if (!dataLoaded) {
     return (
-      <main role="status" aria-live="polite" className="flex min-h-screen items-center justify-center bg-[radial-gradient(ellipse_at_top,rgba(244,199,91,.12),transparent_50%),#080a0b] px-4 py-10 text-stone-100">
-        <section className="w-full max-w-md rounded-3xl border border-amber-300/20 bg-[#111619]/95 p-6 shadow-2xl shadow-black/40 sm:p-8">
-          <FacheeBookLogo className="justify-center" />
-          <div className="mt-8 flex flex-col items-center text-center">
-            <span className="relative flex h-14 w-14 items-center justify-center" aria-hidden="true">
-              <span className="absolute inset-0 rounded-full border-2 border-amber-300/20" />
-              <span className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-amber-300" />
-              <BookOpen className="h-5 w-5 text-amber-200" />
-            </span>
-            <h1 className="mt-5 text-lg font-extrabold text-white">Preparing your study space</h1>
-            <p className="mt-2 max-w-xs text-sm leading-6 text-stone-300">
-              Restoring your saved materials and connecting your account. Your library will be ready shortly.
-            </p>
-          </div>
-          <div className="mt-7 space-y-3" aria-hidden="true">
-            <div className="h-2.5 w-full animate-pulse rounded-full bg-white/10" />
-            <div className="h-2.5 w-4/5 animate-pulse rounded-full bg-white/10" />
-            <div className="h-2.5 w-2/3 animate-pulse rounded-full bg-white/10" />
-          </div>
-          <p className="mt-6 text-center text-[11px] font-semibold tracking-wide text-amber-200/70">PLEASE KEEP THIS PAGE OPEN</p>
-        </section>
-      </main>
+      <>
+        <main role="status" aria-live="polite" className="flex min-h-screen items-center justify-center bg-[radial-gradient(ellipse_at_top,rgba(244,199,91,.12),transparent_50%),#080a0b] px-4 py-10 text-stone-100">
+          <section className="w-full max-w-md rounded-3xl border border-amber-300/20 bg-[#111619]/95 p-6 shadow-2xl shadow-black/40 sm:p-8">
+            <FacheeBookLogo className="justify-center" />
+            <div className="mt-8 flex flex-col items-center text-center">
+              <span className="relative flex h-14 w-14 items-center justify-center" aria-hidden="true">
+                <span className="absolute inset-0 rounded-full border-2 border-amber-300/20" />
+                <span className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-amber-300" />
+                <BookOpen className="h-5 w-5 text-amber-200" />
+              </span>
+              <h1 className="mt-5 text-lg font-extrabold text-white">Preparing your study space</h1>
+              <p className="mt-2 max-w-xs text-sm leading-6 text-stone-300">
+                Restoring your saved materials and connecting your account. Your library will be ready shortly.
+              </p>
+            </div>
+            <div className="mt-7 space-y-3" aria-hidden="true">
+              <div className="h-2.5 w-full animate-pulse rounded-full bg-white/10" />
+              <div className="h-2.5 w-4/5 animate-pulse rounded-full bg-white/10" />
+              <div className="h-2.5 w-2/3 animate-pulse rounded-full bg-white/10" />
+            </div>
+            <p className="mt-6 text-center text-[11px] font-semibold tracking-wide text-amber-200/70">PLEASE KEEP THIS PAGE OPEN</p>
+          </section>
+        </main>
+        {activeConflict && (
+          <StudySyncConflictModal
+            key={activeConflict.conflicts.map((conflict) => `${conflict.collection}:${conflict.id}`).join('|')}
+            conflicts={activeConflict.conflicts}
+            onResolve={handleResolveSyncConflicts}
+          />
+        )}
+      </>
     );
   }
 
@@ -2043,6 +2077,14 @@ export default function App() {
             </button>
           </div>
         </div>
+      )}
+
+      {activeConflict && (
+        <StudySyncConflictModal
+          key={activeConflict.conflicts.map((conflict) => `${conflict.collection}:${conflict.id}`).join('|')}
+          conflicts={activeConflict.conflicts}
+          onResolve={handleResolveSyncConflicts}
+        />
       )}
 
     </div>

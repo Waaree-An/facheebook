@@ -6,6 +6,15 @@ type CollectionName = 'study_materials' | 'study_tips';
 type CloudRow = { id: string; payload: SyncItem | null; updated_at: string; deleted_at: string | null };
 type Tombstone = { deletedAt: string; payload?: SyncItem };
 type Tombstones = Record<string, Tombstone>;
+export type StudySyncConflict = {
+  id: string;
+  collection: CollectionName;
+  local: SyncItem;
+  account: SyncItem;
+  localUpdatedAt: string;
+  accountUpdatedAt: string;
+  newerSource: 'local' | 'account';
+};
 
 function itemTimestamp(item: SyncItem): number {
   const value = 'updatedAt' in item && item.updatedAt ? item.updatedAt : item.createdAt;
@@ -88,7 +97,7 @@ export async function syncStudyCollection<T extends SyncItem>(
   userId: string,
   collection: CollectionName,
   localItems: T[],
-  confirmConflicts?: (count: number) => boolean,
+  confirmAppliedConflicts?: (conflicts: StudySyncConflict[]) => Promise<boolean>,
   signal?: AbortSignal,
 ): Promise<T[]> {
   const query = client
@@ -111,14 +120,22 @@ export async function syncStudyCollection<T extends SyncItem>(
   const tombstones = readTombstones(userId, collection);
   const localById = new Map(localItems.map((item) => [item.id, item]));
   const cloudById = new Map(cloudRows.map((row) => [row.id, row]));
-  const conflicts = localItems.filter((item) => {
+  const conflicts: StudySyncConflict[] = localItems.flatMap((item): StudySyncConflict[] => {
     const cloud = cloudById.get(item.id);
-    return cloud?.payload
-      && JSON.stringify(canonicalize(cloud.payload)) !== JSON.stringify(canonicalize(withoutAttachmentData(item)));
-  }).length;
-  if (conflicts && confirmConflicts && !confirmConflicts(conflicts)) {
-    throw new Error('Cloud sync paused. No conflicting records were changed.');
-  }
+    if (!cloud?.payload
+      || JSON.stringify(canonicalize(cloud.payload)) === JSON.stringify(canonicalize(withoutAttachmentData(item)))) {
+      return [];
+    }
+    return [{
+      id: item.id,
+      collection,
+      local: item,
+      account: cloud.payload,
+      localUpdatedAt: itemTimestamp(item) ? new Date(itemTimestamp(item)).toISOString() : item.createdAt,
+      accountUpdatedAt: cloud.updated_at,
+      newerSource: Date.parse(cloud.updated_at) >= itemTimestamp(item) ? 'account' : 'local',
+    }];
+  });
   const ids = new Set([...localById.keys(), ...cloudById.keys(), ...Object.keys(tombstones)]);
   const upserts: Array<{ id: string; user_id: string; payload: SyncItem | null; updated_at: string; deleted_at: string | null }> = [];
   const merged: T[] = [];
@@ -161,6 +178,30 @@ export async function syncStudyCollection<T extends SyncItem>(
     const saveQuery = client.from(collection).upsert(upserts, { onConflict: 'user_id,id' });
     const { error: saveError } = await (signal ? saveQuery.abortSignal(signal) : saveQuery);
     if (saveError) throw new Error(`Could not sync cloud ${collection === 'study_materials' ? 'materials' : 'tips'}: ${saveError.message}`);
+  }
+  if (conflicts.length && confirmAppliedConflicts && !await confirmAppliedConflicts(conflicts)) {
+    const rollbackTimestamp = new Date().toISOString();
+    const rollbackRows = conflicts.map((conflict) => {
+      const localIsNewer = Date.parse(conflict.localUpdatedAt) > Date.parse(conflict.accountUpdatedAt);
+      const previousVersion = localIsNewer ? conflict.account : conflict.local;
+      return {
+        id: conflict.id,
+        user_id: userId,
+        payload: withoutAttachmentData(preserveLocalAttachmentData(previousVersion, conflict.local)),
+        updated_at: rollbackTimestamp,
+        deleted_at: null,
+      };
+    });
+    const rollbackQuery = client.from(collection).upsert(rollbackRows, { onConflict: 'user_id,id' });
+    const { error: rollbackError } = await (signal ? rollbackQuery.abortSignal(signal) : rollbackQuery);
+    if (rollbackError) {
+      throw new Error(`Could not discard the synced changes and restore the earlier version: ${rollbackError.message}`);
+    }
+    const previousById = new Map(rollbackRows.map((row) => [row.id, row.payload]));
+    for (let index = merged.length - 1; index >= 0; index -= 1) {
+      const previous = previousById.get(merged[index].id);
+      if (previous) merged[index] = previous as T;
+    }
   }
   try {
     localStorage.setItem(`fachee_sync_tombstones_${userId}_${collection}`, JSON.stringify(tombstones));
